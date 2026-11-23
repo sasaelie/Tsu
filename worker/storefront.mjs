@@ -207,10 +207,14 @@ async function renderStorefront(request,env) {
   const all = await products(env);
   const publiclyAvailable = all.filter(product=>canViewProduct(product,false));
   if (pathname==='/sitemap.xml') {
-    const editions=await listEditions(env,true);
+    const [editions,articles]=await Promise.all([listEditions(env,true),journalArticles(env,true)]);
     const pages = [...Object.keys(storefrontPaths),...Object.keys(editorialPages),...journal.map(item=>'/blog/'+item.slug),
       ...editions.map(edition=>editionPath(edition.week)),...publiclyAvailable.map(productPath)];
-    const urls = pages.flatMap(path=>[path,languagePath(path,true)]).map(path=>'<url><loc>'+htmlEscape(origin+path)+'</loc></url>').join('');
+    const articleUrls=articles.flatMap(article=>{
+      const path=journalArticlePath(article.slug);
+      return article.titleEn && article.bodyEn ? [path,languagePath(path,true)] : [path];
+    });
+    const urls = [...pages.flatMap(path=>[path,languagePath(path,true)]),...articleUrls].map(path=>'<url><loc>'+htmlEscape(origin+path)+'</loc></url>').join('');
     return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls+'</urlset>',{
       headers:{...headers,'Content-Type':'application/xml; charset=utf-8'}
     });
@@ -221,10 +225,12 @@ async function renderStorefront(request,env) {
     .sort((a,b)=>Number(b.featured)-Number(a.featured));
   const {en} = route;
   const edition=route.week ? await getEdition(env,route.week,true) : null;
+  const managedArticle=route.slug && route.page==='managed-article' ? await journalArticle(env,route.slug) : null;
+  if (managedArticle && en && (!managedArticle.titleEn || !managedArticle.bodyEn)) return Response.redirect(origin+route.path,302);
   const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
   const product = route.id ? published.find(item=>item.id===route.id) : null;
   if (product && !canViewProduct(product,false)) headers['X-Robots-Tag'] = 'noindex, nofollow';
-  const page = route.id ? (product ? 'product' : 'missing') : route.week&&!edition ? 'missing' : route.page ?? storefrontPaths[route.path];
+  const page = route.id ? (product ? 'product' : 'missing') : (route.week&&!edition || route.page==='managed-article'&&!managedArticle) ? 'missing' : route.page ?? storefrontPaths[route.path];
   const path = product ? productPath(product) : route.id ? '/' : route.path;
   if (product && pathname !== languagePath(path,en)) return Response.redirect(origin+languagePath(path,en),301);
   const titles = {
@@ -233,7 +239,7 @@ async function renderStorefront(request,env) {
     terms:local(en,'Conditions de vente','Terms of sale'),privacy:local(en,'Confidentialité','Privacy'),
     product:product?.name,missing:local(en,'Produit introuvable','Product not found')
   };
-  const heading = page==='missing' ? titles.missing : route.title || titles[page];
+  const heading = page==='missing' ? titles.missing : (managedArticle && local(en,managedArticle.titleFr,managedArticle.titleEn)) || route.title || titles[page];
   const canonical = origin+languagePath(path,en);
   const defaults = {
     home:local(en,'TSŪ, le vestiaire otaku. T-shirts et accessoires inspirés du manga, fabriqués à la demande.','TSŪ, the otaku wardrobe. Manga-inspired T-shirts and accessories, made to order.'),
@@ -241,7 +247,7 @@ async function renderStorefront(request,env) {
     acc:local(en,'Découvre les accessoires manga de TSŪ, des casquettes et bobs aux autres pièces de la collection.','Browse TSŪ manga accessories, including caps, bucket hats and other pieces.'),
     product:product ? product.name+' · '+typeName(product.type,en)+' · '+local(en,'Fabrication à la demande. Consulte les variantes, le prix et la livraison sur TSŪ.','Made to order. See options, pricing and delivery at TSŪ.') : ''
   };
-  const description = text(local(en,route.descFr,route.descEn) || product?.[en?'en':'fr'] || product?.[en?'fr':'en'] || defaults[page] ||
+  const description = text((managedArticle && (local(en,managedArticle.seoFr,managedArticle.seoEn) || local(en,managedArticle.bodyFr,managedArticle.bodyEn))) || local(en,route.descFr,route.descEn) || product?.[en?'en':'fr'] || product?.[en?'fr':'en'] || defaults[page] ||
     heading+' · '+local(en,'Informations de la boutique TSŪ.','TSŪ store information.'),155);
   const schema = product ? {
     '@context':'https://schema.org','@type':'Product',name:product.name,
@@ -249,24 +255,29 @@ async function renderStorefront(request,env) {
     ...(product[en?'en':'fr'] || product[en?'fr':'en'] ? {description} : {}),
     ...(product.material ? {material:product.material} : {}),
     category:typeName(product.type,en),sku:product.id,url:canonical
-  } : ['article','edition'].includes(page) ? {'@context':'https://schema.org','@type':'BlogPosting',headline:heading,description,url:canonical,
-    datePublished:edition ? edition.publishedAt.slice(0,10) : '2026-11-23',inLanguage:en?'en':'fr',author:{'@type':'Organization',name:'TSŪ',url:origin+languagePath('/a-propos',en)}} :
+  } : ['article','edition','managed-article'].includes(page) ? {'@context':'https://schema.org','@type':'BlogPosting',headline:heading,description,url:canonical,
+    datePublished:(managedArticle ?? edition)?.publishedAt.slice(0,10) ?? '2026-11-23',inLanguage:en?'en':'fr',author:{'@type':'Organization',name:'TSŪ',url:origin+languagePath('/a-propos',en)}} :
     page==='home' ? {'@context':'https://schema.org','@type':'WebSite',name:'TSŪ',url:canonical,inLanguage:en?'en':'fr'} : null;
   const title = heading+' | TSŪ';
   const meta = '<title>'+htmlEscape(title)+'</title><meta name="description" content="'+htmlEscape(description)+'">'+
     ((!indexable || page==='missing') ? '<meta name="robots" content="noindex, nofollow">' : '')+
-    (page==='missing' ? '' : '<link rel="canonical" href="'+htmlEscape(canonical)+'"><link rel="alternate" hreflang="fr" href="'+htmlEscape(origin+path)+'"><link rel="alternate" hreflang="en" href="'+htmlEscape(origin+languagePath(path,true))+'">')+
+    (page==='missing' ? '' : '<link rel="canonical" href="'+htmlEscape(canonical)+'"><link rel="alternate" hreflang="fr" href="'+htmlEscape(origin+path)+'">'+(managedArticle && (!managedArticle.titleEn || !managedArticle.bodyEn) ? '' : '<link rel="alternate" hreflang="en" href="'+htmlEscape(origin+languagePath(path,true))+'">'))+
     '<meta property="og:title" content="'+htmlEscape(title)+'"><meta property="og:description" content="'+htmlEscape(description)+'"><meta property="og:url" content="'+htmlEscape(canonical)+'">'+
     '<meta property="og:image" content="'+htmlEscape(safePhoto(product?.image) || origin+'/room.webp')+'">'+
     (schema ? '<script type="application/ld+json">'+jsonScript(schema)+'</script>' : '');
   let main;
   if (page==='home') main = homeContent(published,settings,en,member)+(!checkoutReturn ? editorialPromo(en) : '');
   else if (page==='product') main = productContent(product,settings,en);
+  else if (page==='managed-article') main = '<article class="shop-section info-page editorial"><h1>'+htmlEscape(heading)+'</h1><div class="preserve-lines">'+
+    htmlEscape(local(en,managedArticle.bodyFr,managedArticle.bodyEn))+'</div><p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p></article>';
   else if (['about','faq','blog','article','archive','edition'].includes(page)) {
     const editions=['blog','archive'].includes(page) ? await listEditions(env,true) : [];
+    const articles=['blog','archive'].includes(page) ? await journalArticles(env,true) : [];
+    const articleList=articles.length ? '<ul class="release-list">'+articles.map(article=>'<li>'+
+      navLink(journalArticlePath(article.slug),Boolean(en && article.titleEn && article.bodyEn),htmlEscape(article.titleFr),htmlEscape(article.titleEn))+'</li>').join('')+'</ul>' : '';
     const content = page==='about' ? aboutEditorial(en) : page==='faq' ? faqEditorial(en) :
-      page==='blog' ? journalEditorial(en,editions)+editorialSponsor(env,en) :
-        page==='archive' ? editionList(editions,en)+'<p>'+navLink('/blog/5-mangas-novembre-2026',en,'Sélection de novembre 2026','November 2026 selection')+'</p>' :
+      page==='blog' ? articleList+journalEditorial(en,editions)+editorialSponsor(env,en) :
+        page==='archive' ? articleList+editionList(editions,en)+'<p>'+navLink('/blog/5-mangas-novembre-2026',en,'Sélection de novembre 2026','November 2026 selection')+'</p>' :
         page==='edition' ? editionEditorial(edition,en) : articleEditorial(route.article,en);
     main = '<'+(page==='blog'?'section':'article')+' class="shop-section info-page editorial"><h1>'+htmlEscape(heading)+'</h1>'+
       content+'</'+(page==='blog'?'section':'article')+'>';

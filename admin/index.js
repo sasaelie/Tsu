@@ -447,6 +447,9 @@ async function refreshJournal(){
     } else entry.append(button('Relire et modifier',()=>editJournal(edition)));
     list.append(entry);
   }
+  const results=await Promise.allSettled([refreshWatch(editions),refreshArticles(),api('deepseek').then(showDeepseek)]);
+  const failed=results.find(result=>result.status==='rejected');
+  if (failed) throw failed.reason;
 }
 get('journal-new').onclick=()=>editJournal();
 get('journal-refresh').onclick=e=>run(e.currentTarget,refreshJournal);
@@ -464,4 +467,116 @@ journalForm.onsubmit=e=>{
     await refreshJournal();
     notice(publish?'Édition publiée dans le journal.':'Brouillon enregistré.','success');
   });
+};
+
+const articleForm=get('article-form');
+const articleFields=['titleFr','titleEn','seoFr','seoEn','bodyFr','bodyEn'];
+let aiProposal=null;
+function editArticle(article={}) {
+  articleForm.reset();
+  articleForm.dataset.existing=String(Boolean(article.slug));
+  articleForm.elements.slug.disabled=Boolean(article.slug);
+  for (const field of ['slug',...articleFields]) articleForm.elements[field].value=article[field]??'';
+  articleForm.hidden=false;
+}
+get('article-new').onclick=()=>{editArticle();articleForm.elements.slug.focus();};
+async function refreshArticles() {
+  const {articles}=await api('journal/articles');
+  const list=get('journal-articles');
+  list.replaceChildren();
+  for (const article of articles) {
+    const entry=element('p',article.titleFr+' · '+(article.publishedAt?'Publié':'Brouillon')+' ');
+    entry.append(button('Ouvrir',()=>{editArticle(article);articleForm.elements.titleFr.focus();}));
+    if (article.publishedAt) {
+      const link=element('a','Voir en ligne');
+      link.href='/blog/article-'+article.slug;
+      entry.append(' ',link);
+    }
+    list.append(entry);
+  }
+}
+articleForm.onsubmit=e=>{
+  e.preventDefault();
+  const publish=e.submitter.value==='publish';
+  return run(e.submitter,async()=>{
+    const data=Object.fromEntries(['slug',...articleFields].map(field=>[field,articleForm.elements[field].value]));
+    await api('journal/articles',{...data,existing:articleForm.dataset.existing==='true',publish});
+    articleForm.hidden=true;
+    aiProposal=null;
+    get('ai-apply').hidden=true;
+    await refreshArticles();
+    notice(publish?'Article publié dans le Journal.':'Brouillon d’article enregistré.','success');
+  });
+};
+
+async function refreshWatch(editions) {
+  const status=get('watch-status');
+  const list=get('watch-drafts');
+  try {
+    const {configured,drafts,runs}=await api('journal/watch');
+    const latest=runs[0];
+    feedback(status,latest?new Date(latest.checked_at).toLocaleString('fr-BE',{timeZone:'Europe/Brussels'})+
+      ' · '+latest.count+' sorties retenues'+(latest.sources.some(source=>!source.ok)?' · Certaines sources étaient indisponibles.':''):
+      configured?'En attente du premier passage.':'Connexion Supabase à configurer.',latest?.count?'success':'neutral');
+    list.replaceChildren();
+    for (const draft of drafts.filter(draft=>!editions.some(edition=>edition.week===draft.week))) {
+      const entry=element('p',draft.week+' · '+draft.contents.items.length+' sorties ');
+      entry.append(button('Ouvrir le brouillon',control=>run(control,async()=>{
+        const {edition}=await api('journal/watch/import',{week:draft.week});
+        await refreshJournal();
+        if (!edition.publishedAt) editJournal(edition);
+        else notice('Cette édition est déjà publiée.','success');
+      })));
+      list.append(entry);
+    }
+  } catch(error) { feedback(status,error.message,'error'); }
+}
+
+const aiConfig=get('ai-config');
+const aiRequest=get('ai-request');
+let aiConnected=false;
+function showDeepseek(state) {
+  aiConnected=state.connected;
+  aiConfig.elements.model.value=state.model;
+  aiRequest.querySelector('[type="submit"]').disabled=!aiConnected;
+  feedback(get('ai-status'),aiConnected?'DeepSeek connecté.':'DeepSeek à connecter.',aiConnected?'success':'neutral');
+}
+aiConfig.onsubmit=e=>{
+  e.preventDefault();
+  const {key,model}=Object.fromEntries(new FormData(aiConfig));
+  return run(e.submitter,async()=>{
+    const state=await api('deepseek',{key,model});
+    aiConfig.elements.key.value='';
+    showDeepseek(state);
+  });
+};
+aiRequest.onsubmit=e=>{
+  e.preventDefault();
+  if (!aiConnected) return;
+  aiProposal=null;
+  get('ai-apply').hidden=true;
+  get('ai-result').hidden=true;
+  const data=Object.fromEntries(new FormData(aiRequest));
+  if (!articleForm.hidden && ['edit','seo'].includes(data.action)) {
+    data.draft=Object.fromEntries(articleFields.map(field=>[field,articleForm.elements[field].value]));
+  }
+  return run(e.submitter,async()=>{
+    const proposal=await api('deepseek/generate',data);
+    const output=get('ai-result');
+    output.textContent=proposal.analysis??Object.values(proposal.fields).filter(Boolean).join('\n\n');
+    output.hidden=false;
+    aiProposal=proposal.fields??null;
+    get('ai-apply').hidden=!aiProposal;
+  });
+};
+get('ai-apply').onclick=()=>{
+  if (!aiProposal) return;
+  if (articleForm.hidden) editArticle();
+  for (const [field,value] of Object.entries(aiProposal)) {
+    if (value) articleForm.elements[field].value=value;
+  }
+  aiProposal=null;
+  get('ai-apply').hidden=true;
+  articleForm.elements.titleFr.focus();
+  notice('Proposition copiée dans le formulaire. Relis-la avant d’enregistrer.','success');
 };

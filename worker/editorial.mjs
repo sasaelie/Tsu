@@ -140,6 +140,8 @@ function editorialRoute(pathname) {
     const week=weekly[2];
     return {path:editionPath(week),enPath:editionEnglishPath(week),page:'edition',en,week,title:editionTitle(week,en)};
   }
+  const managed = /^article-([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(match[2]);
+  if (managed) return {path:journalArticlePath(managed[1]),page:'managed-article',en,slug:managed[1]};
   const article = journal.find(item=>(en?item.enSlug:item.slug)===match[2]);
   return article
     ? {...article,article,path:'/blog/'+article.slug,enPath:'/en/blog/'+article.enSlug,page:'article',en,title:en?article.en:article.fr}
@@ -149,6 +151,7 @@ function editorialRoute(pathname) {
 function editorialEnglishPath(path) {
   if (editorialPages[path]) return editorialPages[path].enPath;
   if (/^\/blog\/veille-\d{4}-\d{2}-\d{2}$/.test(path)) return editionEnglishPath(path.slice(-10));
+  if (path.startsWith('/blog/article-')) return '/en'+path;
   const item = journal.find(article=>path==='/blog/'+article.slug);
   return item ? '/en/blog/'+item.enSlug : '';
 }

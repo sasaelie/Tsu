@@ -139,6 +139,13 @@ async function handle(request, env) {
   if (method === 'POST' && pathname === '/api/admin/newsletter/send') return sendDesignAnnouncement(request,env);
   if (method === 'POST' && pathname === '/api/admin/tickets/reply') return replyToTicket(env,await body(request));
   if (method === 'POST' && pathname === '/api/admin/tickets/status') return setTicketStatus(request,env);
+  if (method === 'GET' && pathname === '/api/admin/journal/watch') return json(await journalWatch(env));
+  if (method === 'POST' && pathname === '/api/admin/journal/watch/import') return json(await importJournalWatch(env,(await body(request,1024)).week));
+  if (method === 'GET' && pathname === '/api/admin/journal/articles') return json({articles:await journalArticles(env)});
+  if (method === 'POST' && pathname === '/api/admin/journal/articles') return json(await saveJournalArticle(env,await body(request,22000)));
+  if (method === 'GET' && pathname === '/api/admin/deepseek') return json(await deepseekStatus(env));
+  if (method === 'POST' && pathname === '/api/admin/deepseek') return json(await saveDeepseek(env,await body(request,2048)));
+  if (method === 'POST' && pathname === '/api/admin/deepseek/generate') return json(await deepseekGenerate(env,await body(request,39000)));
   if (method === 'GET' && pathname === '/api/admin/journal') return json({editions:await listEditions(env)});
   if (method === 'POST' && pathname === '/api/admin/journal/save') return json(await saveEdition(env,await body(request,26000)));
   if (method === 'POST' && pathname === '/api/admin/journal/publish') return json(await publishEdition(env,(await body(request,1024)).week));

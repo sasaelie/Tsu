@@ -44,3 +44,93 @@ async function printfulSetup(request,env) {
     .bind(binaryBase64(ciphertext),binaryBase64(nonce),store).run();
   return json({store});
 }
+
+function importVariant(variant) {
+  const syncId = Number(variant.id);
+  if (!Number.isSafeInteger(syncId) || syncId < 1 || !variant.synced || variant.is_ignored === true) return null;
+  const parts = /\(([^()]+)\s+\/\s+([^()]+)\)$/.exec(variant.product?.name ?? '');
+  return {
+    id:'pfv-'+syncId, syncId,
+    size:text(variant.size || parts?.[2],32),
+    color:text(variant.color || parts?.[1],40),
+    label:text(variant.name,100)
+  };
+}
+
+function importedProduct(source, detail) {
+  const product = detail.sync_product ?? source;
+  const synced = Array.isArray(detail.sync_variants) ? detail.sync_variants : [];
+  const selected = synced.map(sourceVariant=>({ sourceVariant, variant:importVariant(sourceVariant) }))
+    .filter(item=>item.variant);
+  const variants = selected.map(item=>item.variant);
+  const prices = selected.map(({sourceVariant:variant})=>{
+    if (variant.currency !== 'EUR' || !/^\d+(\.\d{1,2})?$/.test(String(variant.retail_price))) return null;
+    const cents = Math.round(Number(variant.retail_price)*100);
+    return cents >= 50 && cents <= 999900 ? cents : null;
+  });
+  const price = prices.length && prices.every(value=>value === prices[0]) ? prices[0] : null;
+  const names = [product.name,...synced.map(variant=>variant.product?.name)].filter(Boolean).join(' ');
+  const type = /\b(?:t[\s-]?shirts?|tees?)\b/i.test(names) ? 'tee'
+    : /\b(?:totes?|bags?|sacs?|casquettes?|caps?|hats?|beanies?|bonnets?|stickers?|mugs?|accessoires?)\b/i.test(names) ? 'acc' : '';
+  const thumbnail = [product.thumbnail_url,source.thumbnail_url].find(value=>{
+    try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && value.length <= 2048; }
+    catch { return false; }
+  });
+  return {
+    id:'pf-'+source.id, name:text(product.name,100) || 'Produit Printful '+source.id,
+    type, price, variants, image:thumbnail ?? '',
+    fr:text(product.description_fr ?? '',1500), en:text(product.description_en ?? '',1500),
+    published:false, featured:false
+  };
+}
+
+async function importPrintfulPage(env, offset) {
+  if (!Number.isSafeInteger(offset) || offset < 0) fail('Position de synchronisation invalide.');
+  const connection = await activePrintful(env);
+  if (!connection) fail('Connecte Printful avant de synchroniser.',503);
+  const limit = 8;
+  const page = await printful(env,'/store/products?limit='+limit+'&offset='+offset,undefined,connection,true);
+  if (!Array.isArray(page.result)) fail('Catalogue Printful indisponible.',502);
+  const existing = await products(env);
+  const ids = new Set(existing.map(product=>product.id));
+  const existingVariants = new Set(existing.flatMap(product=>product.variants.map(variant=>variant.syncId)).filter(Boolean));
+  const candidates = page.result.slice(0,limit).filter(product=>
+    Number.isSafeInteger(product.id) && product.id > 0 && product.is_ignored !== true && !ids.has('pf-'+product.id)
+  );
+  const rows = await Promise.allSettled(candidates.map(async source=>{
+    const detail = await printful(env,'/store/products/'+source.id,undefined,connection);
+    return importedProduct(source,detail);
+  }));
+  let added = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (row.status === 'rejected') {
+      failed++;
+      continue;
+    }
+    const draft = row.value;
+    if (draft.variants.some(variant=>existingVariants.has(variant.syncId))) continue;
+    const saved = await env.DB.prepare('INSERT INTO products (id,data) VALUES (?,?) ON CONFLICT(id) DO NOTHING')
+      .bind(draft.id,JSON.stringify(draft)).run();
+    added += Number(saved.meta.changes);
+  }
+  const received = Math.min(limit,page.result.length);
+  const next = offset + received;
+  const more = received > 0 && (Number.isSafeInteger(page.paging?.total) ? next < page.paging.total : received === limit);
+  return json({added,failed,next:more ? next : null,total:page.paging?.total ?? null});
+}
+
+async function validatePrintfulVariants(env, product) {
+  const connection = await activePrintful(env);
+  if (!connection) return;
+  if (/^pf-\d+$/.test(product.id)) {
+    const result = await printful(env,'/store/products/'+product.id.slice(3),undefined,connection);
+    const valid = new Set((result.sync_variants ?? []).map(importVariant).filter(Boolean).map(variant=>variant.syncId));
+    if (product.variants.some(variant=>!valid.has(variant.syncId))) fail('Une variante Printful de ce produit n’est plus synchronisée.');
+    return;
+  }
+  for (const variant of product.variants) {
+    const result = await printful(env,'/store/variants/'+variant.syncId,undefined,connection);
+    if (!importVariant(result.sync_variant ?? result)) fail('Une variante Printful est introuvable ou non synchronisée.');
+  }
+}

@@ -2,3 +2,7 @@
 #printful-credentials{margin-top:1rem}
 #printful-credentials summary{width:fit-content;cursor:pointer;color:#2435a7;padding:.45rem 0}
 #printful-form>button{margin-top:.85rem}
+.password-field{display:flex;align-items:stretch;gap:.35rem;margin-top:.3rem}
+.password-field input{min-width:0;flex:1;border:1px solid #71677c;padding:.5rem;font:inherit}
+.password-field button{display:grid;place-items:center;min-width:44px;padding:.35rem}
+.product-summary{min-width:0;flex:1}.product-summary img{float:left;width:64px;height:64px;object-fit:contain;margin:0 .75rem .15rem 0}.product-actions{display:flex;flex-wrap:wrap;gap:.5rem}.product-actions button:last-child:not(:first-child){background:#ffe440}

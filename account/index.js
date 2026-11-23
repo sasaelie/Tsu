@@ -14,6 +14,13 @@ async function request(path, data) {
   if (!response.ok) throw new Error(payload.error || 'Action impossible.');
   return payload;
 }
+function showPassword(visible) {
+  form.elements.password.type = visible ? 'text' : 'password';
+  get('show-password').setAttribute('aria-label',visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+  get('show-password').setAttribute('aria-pressed',String(visible));
+  get('password-slash').toggleAttribute('hidden',!visible);
+}
+get('show-password').onclick = ()=>showPassword(form.elements.password.type === 'password');
 function selectMode(next) {
   mode = next;
   const register = mode === 'register';
@@ -23,6 +30,7 @@ function selectMode(next) {
   form.elements.password.minLength = register ? 15 : 1;
   form.elements.password.autocomplete = register ? 'new-password' : 'current-password';
   form.elements.password.value = '';
+  showPassword(false);
   get('explanation').textContent = register
     ? 'L’adresse du compte propriétaire est reprise automatiquement. Choisis ton mot de passe TSŪ.'
     : 'Utilise l’adresse et le mot de passe de ton compte TSŪ.';

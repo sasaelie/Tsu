@@ -68,7 +68,7 @@ function saveCart(){
 }
 const closeButton = () => '<button class="close" data-close aria-label="'+tr('close')+'">✕</button>';
 function openProduct(item){
-  const options = item.variants?.map(variant=>'<option value="'+variant.id+'">'+escapeText([variant.size,variant.color].filter(Boolean).join(' · ') || item.name)+'</option>');
+  const options = item.variants?.map(variant=>'<option value="'+variant.id+'">'+escapeText([variant.size,variant.color].filter(Boolean).join(' · ') || variant.label || item.name)+'</option>');
   const sizes = options
     ? '<label class="row">'+(language === 'fr' ? 'Variante' : 'Variant')+' <select id="size">'+options.join('')+'</select></label>'
     : item.type === 'tee' ? '<label class="row">'+tr('size')+' <select id="size">'+['S','M','L','XL','XXL'].map(size=>'<option>'+size+'</option>').join('')+'</select></label>' : '';
@@ -91,7 +91,7 @@ function variantLabel(line) {
   const item = lookup(line.id);
   if (!item.variants) return line.size;
   const variant = item.variants.find(option=>option.id === line.size);
-  return [variant?.size, variant?.color].filter(Boolean).join(' · ') || item.name;
+  return [variant?.size, variant?.color].filter(Boolean).join(' · ') || variant?.label || item.name;
 }
 async function stripeCheckout(button) {
   button.disabled = true;

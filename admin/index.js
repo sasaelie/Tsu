@@ -2,6 +2,7 @@ const get = id => document.getElementById(id);
 const form = get('product-form');
 const settingsForm = get('settings-form');
 let state;
+let syncing = false;
 const euro = cents => new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(cents/100);
 const notice = message => { get('notice').textContent = message; };
 
@@ -34,6 +35,7 @@ function button(label, action) {
 function variantRow(variant = {}) {
   const row = element('div',null,'variant');
   row.dataset.id = variant.id ?? '';
+  row.dataset.label = variant.label ?? '';
   for (const [key,label,type,max] of [
     ['size','Taille','text',32],['color','Couleur','text',40],['syncId','ID de variante Printful','number',0]
   ]) {
@@ -95,16 +97,50 @@ function renderOrders() {
 async function refresh() {
   state = await api();
   get('identity').textContent = state.email ? 'Compte propriétaire · '+state.email : 'Compte propriétaire';
+  renderProducts();
+  get('sync-catalog').hidden = !state.printful;
+  get('catalog-sync-status').hidden = !state.printful;
+  refreshSettings();
+  renderOrders();
+}
+function renderProducts() {
   const list = get('product-list');
   list.replaceChildren();
   if (!state.products.length) list.append(element('p','Aucun produit enregistré. Le catalogue de démonstration reste disponible.'));
   for (const product of state.products) {
     const row = element('div',null,'record');
-    row.append(element('strong',product.name+' · '+euro(product.price)),
-      element('span',(product.published ? 'Publié' : 'Brouillon')+' · '+product.variants.filter(variant=>variant.syncId).length+'/'+product.variants.length+' variantes associées'),
-      button('Modifier',()=>editProduct(product)));
+    const category = {tee:'T-shirts',acc:'Accessoires'}[product.type];
+    const title = element('div',null,'product-summary');
+    if (product.image) {
+      const image = document.createElement('img');
+      image.src = product.image;
+      image.alt = '';
+      image.loading = 'lazy';
+      title.append(image);
+    }
+    title.append(element('strong',product.name));
+    const needs = [!category && 'catégorie',!product.price && 'prix',!product.variants.length && 'variantes'].filter(Boolean);
+    const ready = !needs.length && product.variants.every(variant=>variant.syncId);
+    const details = element('p',[
+      product.published ? 'Publié' : product.id.startsWith('pf-') ? 'Brouillon Printful' : 'Brouillon',
+      category,product.price && euro(product.price),product.variants.length+' variante(s)',
+      needs.length ? 'À compléter · '+needs.join(', ') : ''
+    ].filter(Boolean).join(' · '));
+    title.append(details);
+    const controls = element('div',null,'product-actions');
+    controls.append(button(product.published ? 'Modifier' : 'Vérifier la fiche',()=>editProduct(product)));
+    if (product.id.startsWith('pf-') && !product.published && ready) {
+      controls.append(button('Valider et publier',control=>run(control,async ()=>{
+        await api('products',{...product,published:true});
+        await refresh();
+        notice(product.name+' est visible dans '+category+'.');
+      })));
+    }
+    row.append(title,controls);
     list.append(row);
   }
+}
+function refreshSettings() {
   for(const key of ['tagFr','tagEn','pitchFr','pitchEn']) settingsForm.elements[key].value = state.settings[key] ?? '';
   settingsForm.elements.be.checked = state.settings.countries.includes('BE');
   settingsForm.elements.fr.checked = state.settings.countries.includes('FR');
@@ -113,7 +149,6 @@ async function refresh() {
   get('printful-credentials-label').textContent = state.printful ? 'Remplacer le jeton' : 'Configurer la connexion';
   get('printful-credentials').open = !state.printful;
   get('printful-credentials').hidden = false;
-  renderOrders();
 }
 function tab(id) {
   document.querySelectorAll('main > section').forEach(section=>{section.hidden = section.id !== id;});
@@ -121,6 +156,7 @@ function tab(id) {
     if(control.dataset.tab === id) control.setAttribute('aria-current','true');
     else control.removeAttribute('aria-current');
   });
+  if (id === 'products') syncCatalog();
 }
 document.querySelectorAll('[data-tab]').forEach(control=>{control.onclick=()=>tab(control.dataset.tab);});
 get('new').onclick = ()=>editProduct();
@@ -133,7 +169,7 @@ form.onsubmit = event=>{
   data.published = form.elements.published.checked;
   data.featured = form.elements.featured.checked;
   data.variants = [...get('variants').children].map(row=>({
-    id:row.dataset.id,...Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.key,input.value]))
+    id:row.dataset.id,label:row.dataset.label,...Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.key,input.value]))
   }));
   return run(event.submitter,async ()=>{
     await api('products',data);
@@ -165,5 +201,41 @@ get('printful-form').onsubmit = event=>{
     notice('Printful connecté à '+store+'.');
   });
 };
+async function syncCatalog() {
+  if (!state?.printful || syncing) return;
+  syncing = true;
+  const control = get('sync-catalog');
+  const status = get('catalog-sync-status');
+  control.disabled = true;
+  status.textContent = 'Recherche de nouveaux produits Printful…';
+  let added = 0;
+  let failed = 0;
+  let total;
+  try {
+    let offset = 0;
+    do {
+      const result = await api('printful/import',{offset});
+      added += result.added;
+      failed += result.failed;
+      total = result.total ?? total;
+      offset = result.next;
+    } while (offset !== null);
+    const latest = await api();
+    state.products = latest.products;
+    renderProducts();
+    status.textContent = added ? added+' nouveau(x) produit(s) en brouillon.' :
+      total === 0 ? 'Aucun produit disponible dans ta boutique Printful.' : 'Aucun nouveau produit à importer.';
+    if (failed) status.textContent += ' '+failed+' fiche(s) n’ont pas pu être lues. Tu peux actualiser.';
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    syncing = false;
+    control.disabled = false;
+  }
+}
+get('sync-catalog').onclick = syncCatalog;
 tab(new URLSearchParams(location.search).get('tab') === 'printful' ? 'printful' : 'products');
-run(null,refresh);
+run(null,async ()=>{
+  await refresh();
+  if (!get('products').hidden) await syncCatalog();
+});

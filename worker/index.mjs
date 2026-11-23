@@ -29,16 +29,16 @@ function productData(input) {
     try { url = new URL(image); } catch { fail('URL de photo invalide.'); }
     if (url.protocol !== 'https:' || url.username || url.password) fail('Utilise une URL HTTPS pour la photo.');
   }
-  if (!Array.isArray(input.variants) || input.variants.length > 40) fail('Variantes invalides.');
+  if (!Array.isArray(input.variants) || input.variants.length > 100) fail('Variantes invalides.');
   const variants = input.variants.map(variant => {
     const size = text(variant.size, 32);
     const color = text(variant.color, 40);
     const syncId = Number(variant.syncId || 0);
     if (!Number.isSafeInteger(syncId) || syncId < 0) fail('Identifiant de variante Printful invalide.');
-    return { id: idPattern.test(variant.id ?? '') ? variant.id : crypto.randomUUID(), size, color, syncId };
+    return { id: idPattern.test(variant.id ?? '') ? variant.id : crypto.randomUUID(), size, color, syncId, label:text(variant.label,100) };
   });
   if (new Set(variants.map(variant => variant.id)).size !== variants.length ||
-      new Set(variants.map(variant => (variant.size+'|'+variant.color).toLowerCase())).size !== variants.length) {
+      new Set(variants.map(variant => (variant.size+'|'+variant.color+'|'+(!variant.size && !variant.color ? variant.label : '')).toLowerCase())).size !== variants.length) {
     fail('Les variantes doivent être distinctes.');
   }
   if (input.published && (!variants.length || variants.some(variant => !variant.syncId))) {
@@ -57,17 +57,18 @@ async function provider(url, options, label) {
   return response.json();
 }
 
-async function printful(env, path, payload, config) {
+async function printful(env, path, payload, config, fullResponse = false) {
   const connection = config ?? await activePrintful(env);
   if (!connection) fail('Printful reste à connecter.',503);
-  return (await provider('https://api.printful.com'+path, {
+  const response = await provider('https://api.printful.com'+path, {
     method: payload ? 'POST' : 'GET',
     redirect: 'manual',
     headers: { Authorization:'Bearer '+connection.token,
       ...(connection.storeId ? { 'X-PF-Store-Id':connection.storeId } : {}),
       ...(payload ? { 'Content-Type':'application/json' } : {}) },
     body: payload ? JSON.stringify(payload) : undefined
-  },'Printful')).result;
+  },'Printful');
+  return fullResponse ? response : response.result;
 }
 
 async function storefront(env) {
@@ -86,7 +87,8 @@ async function checkout(request, env, origin) {
     const product = available.find(item => item.id === line.id && item.published);
     const variant = product?.variants.find(item => item.id === line.variantId);
     if (!variant?.syncId || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 20) fail('Un article du panier est indisponible.');
-    return { name: [product.name,variant.size,variant.color].filter(Boolean).join(' · '), price:product.price, syncId:variant.syncId, quantity:line.quantity };
+    const label = [variant.size,variant.color].filter(Boolean).join(' · ') || variant.label;
+    return { name:[product.name,label].filter(Boolean).join(' · '), price:product.price, syncId:variant.syncId, quantity:line.quantity };
   });
   const id = crypto.randomUUID();
   const form = new URLSearchParams({
@@ -191,6 +193,7 @@ async function handle(request, env) {
     return json({ items, settings, stripe:stripeEnabled(env) });
   }
   if (method === 'POST' && pathname === '/api/checkout' && owner) return checkout(request,env,origin);
+  if (method === 'POST' && pathname === '/api/admin/printful/import') return importPrintfulPage(env,(await body(request)).offset);
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
   if (method === 'GET' && pathname === '/api/admin/state') {
     const connection = await readPrintfulConnection(env);
@@ -199,12 +202,7 @@ async function handle(request, env) {
   }
   if (method === 'POST' && pathname === '/api/admin/products') {
     const product = productData(await body(request));
-    if (product.published && await activePrintful(env)) {
-      for (const variant of product.variants) {
-        const result = await printful(env,'/store/variants/'+variant.syncId);
-        if (!result.sync_variant?.synced) fail('Une variante Printful est introuvable ou non synchronisée.');
-      }
-    }
+    if (product.published) await validatePrintfulVariants(env,product);
     await env.DB.prepare('INSERT INTO products (id,data) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data')
       .bind(product.id,JSON.stringify(product)).run();
     return json(product);

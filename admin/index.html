@@ -71,8 +71,12 @@
 <details id="stripe-settings">
 <summary id="stripe-settings-label">Connecter Stripe en mode test</summary>
 <form id="stripe-form">
-<p>Dans l’environnement de test Stripe, crée une clé restreinte avec l’autorisation Lecture et écriture pour Checkout Sessions. La clé doit commencer par <code>rk_test_</code>.</p>
-<p><a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer">Ouvrir les clés API Stripe de test</a></p>
+<ol>
+<li>Dans le sélecteur de compte Stripe, choisis <strong>Basculer vers un environnement de test</strong>, puis <strong>Environnement de test Tsu</strong>. Vérifie que le bandeau de test est affiché.</li>
+<li>Dans cet environnement, ouvre <strong>Clés API</strong>, puis <strong>Créer une clé restreinte</strong>. Autorise <strong>Écriture</strong> pour <strong>Checkout Sessions</strong>.</li>
+<li>Copie la nouvelle clé <code>rk_test_</code> et colle-la ici.</li>
+</ol>
+<p><a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer">Ouvrir Stripe et choisir l’environnement Tsu</a></p>
 <label>Clé Stripe restreinte de test <input name="key" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="510" aria-describedby="stripe-result" required></label>
 <button type="submit">Vérifier et connecter Stripe</button>
 <p id="stripe-result" role="status" aria-live="polite"></p>

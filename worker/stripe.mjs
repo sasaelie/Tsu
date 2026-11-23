@@ -34,7 +34,7 @@ async function stripeRequest(key, path, form, idempotencyKey) {
 
 function stripeKeyInputError(token) {
   if (token.startsWith('pk_')) return 'Tu as saisi une clé publique (pk_). Utilise une clé restreinte de test (rk_test_).';
-  if (/^(?:rk|sk)_live_/.test(token)) return 'Cette clé appartient au mode réel. Utilise une clé restreinte de test (rk_test_).';
+  if (/^(?:rk|sk)_live_/.test(token)) return 'Cette clé vient du mode réel. Dans Stripe, ouvre « Environnement de test Tsu » avant de créer la clé restreinte (rk_test_).';
   if (token.startsWith('sk_test_')) return 'Cette clé secrète n’est pas restreinte. Crée une clé de test qui commence par rk_test_.';
   if (!token.startsWith('rk_test_') || !stripeTestKeyPattern.test(token)) {
     return 'Colle la clé restreinte de test complète. Elle commence par rk_test_.';

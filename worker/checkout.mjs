@@ -1,5 +1,6 @@
 async function checkout(request, env, origin) {
-  if (!stripeEnabled(env)) fail('Stripe en mode test reste à connecter.', 503);
+  const stripeKey = await activeStripeKey(env);
+  if (!stripeKey) fail('Stripe en mode test reste à connecter.', 503);
   const { lines, country, language } = await body(request);
   const config = await storefront(env);
   if (!config.countries.includes(country) || !Array.isArray(lines) || !lines.length || lines.length > 20 || lines.some(line=>!line || typeof line !== 'object')) fail('Panier ou pays invalide.');
@@ -26,7 +27,7 @@ async function checkout(request, env, origin) {
     'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][unit]':'business_day',
     'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][value]':String(shipping.max),
     'shipping_address_collection[allowed_countries][0]':country,
-    'payment_method_types[0]':'card', client_reference_id:id
+    integration_identifier:'tsu-checkout-fzxqcrmt', client_reference_id:id
   });
   items.forEach((item,index) => {
     const key = 'line_items['+index+']';
@@ -35,9 +36,7 @@ async function checkout(request, env, origin) {
     form.set(key+'[price_data][product_data][name]',item.name);
     form.set(key+'[quantity]',String(item.quantity));
   });
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions', {
-    method:'POST', headers:{ Authorization:'Bearer '+env.STRIPE_TEST_KEY, 'Content-Type':'application/x-www-form-urlencoded', 'Idempotency-Key':id }, body:form
-  },'Stripe');
+  const session = await stripeRequest(stripeKey,'/checkout/sessions',form,id);
   if (session.livemode !== false || !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe de test invalide.',502);
   await env.DB.prepare('INSERT INTO shop_orders (id, session_id, data) VALUES (?, ?, ?)')
     .bind(id,session.id,JSON.stringify({ id,country,items,shippingFee:shipping.fee,payment:'unpaid',printful:'none' })).run();
@@ -45,13 +44,12 @@ async function checkout(request, env, origin) {
 }
 
 async function syncOrder(env, id) {
-  if (!stripeEnabled(env) || !idPattern.test(id)) fail('Commande de test indisponible.');
+  const stripeKey = await activeStripeKey(env);
+  if (!stripeKey || !idPattern.test(id)) fail('Commande de test indisponible.');
   const row = await env.DB.prepare('SELECT session_id, data FROM shop_orders WHERE id = ?').bind(id).first();
   if (!row) fail('Commande introuvable.',404);
   const order = JSON.parse(row.data);
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(row.session_id),{
-    headers:{Authorization:'Bearer '+env.STRIPE_TEST_KEY}
-  },'Stripe');
+  const session = await stripeRequest(stripeKey,'/checkout/sessions/'+encodeURIComponent(row.session_id));
   if (session.livemode !== false || session.client_reference_id !== id) fail('Session Stripe invalide.',502);
   const expected = order.items.reduce((sum,item)=>sum+item.price*item.quantity,0) + (order.shippingFee ?? 0);
   if (session.amount_total !== expected || session.currency !== 'eur') fail('Le total Stripe ne correspond pas à la commande.',502);

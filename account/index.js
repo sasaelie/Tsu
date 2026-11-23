@@ -1,7 +1,7 @@
 const get = id => document.getElementById(id);
 const form = get('auth');
-const directToPrintful = new URLSearchParams(location.search).get('destination') === 'printful';
-const adminPath = directToPrintful ? '/admin?tab=printful' : '/admin';
+const destination = new URLSearchParams(location.search).get('destination');
+const adminPath = ['products','settings','profile','printful','orders'].includes(destination) ? '/admin?tab='+destination : '/admin';
 get('admin-link').href = adminPath;
 let mode = 'login';
 let hasOwner = false;

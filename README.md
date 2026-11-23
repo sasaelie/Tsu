@@ -5,6 +5,7 @@
 - `worker/storefront.mjs` rend l’accueil, les collections, les fiches et les pages d’information en HTML côté serveur.
 - `worker/shop-profile.mjs` valide et enregistre les coordonnées publiques et les réglages de livraison.
 - `worker/checkout.mjs` crée les sessions Stripe en mode test et synchronise les commandes d’essai.
+- `worker/stripe.mjs` vérifie et chiffre la clé Stripe du propriétaire.
 - `worker/printful.mjs` gère la connexion Printful et l’import des produits en brouillon.
 - `worker/account.mjs` gère le compte propriétaire.
 - `dist/shop.js` et `dist/cart.js` gèrent le panier et le parcours d’achat dans le navigateur.
@@ -16,7 +17,7 @@ Sur l’hôte actuel, `node worker/build.mjs` assemble le Worker dans `dist/serv
 
 Le site est privé. L’indexation est désactivée par défaut. Le Worker fournit les URL canoniques, les variantes linguistiques, les métadonnées, le balisage Product et le plan du site. Le réglage serveur `TSU_INDEXABLE=true` est destiné au lancement public. Il ne change pas les permissions d’accès de l’hébergeur.
 
-L’achat direct et le panier utilisent le même récapitulatif. Pour tester Stripe, fournir `STRIPE_TEST_KEY` et renseigner les frais et le délai du pays dans l’administration. Aucun paiement réel n’est activé. Les frais configurés ici sont ceux facturés au client à titre de test. Ils ne constituent pas un devis Printful.
+L’achat direct et le panier utilisent le même récapitulatif. Pour tester Stripe, enregistrer une clé restreinte `rk_test_` depuis Commandes et tests et renseigner les frais et le délai du pays dans l’administration. La clé est chiffrée avec le secret serveur `TSU_STRIPE_ENCRYPTION_KEY`. Un réglage d’hébergement `STRIPE_TEST_KEY` est également accepté en l’absence de connexion administrateur. Aucun paiement réel n’est activé. Les frais configurés ici sont ceux facturés au client à titre de test. Ils ne constituent pas un devis Printful.
 
 ## Points à finaliser avant la vente
 

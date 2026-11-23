@@ -70,6 +70,12 @@ function editProduct(product = {}) {
   form.elements.name.focus();
 }
 function renderOrders() {
+  get('stripe-settings-label').textContent = state.stripe ? 'Remplacer la clé de test Stripe' : 'Connecter Stripe en mode test';
+  get('stripe-settings').open = !state.stripe;
+  const ready = state.settings.countries.some(country=>state.profile?.shipping?.[country]);
+  get('stripe-readiness').textContent = state.stripe && !ready
+    ? 'Renseigne les frais et les délais pour au moins un pays dans Coordonnées et livraison afin d’essayer le paiement.'
+    : '';
   get('connections').textContent =
     (state.stripe ? 'Stripe en mode test connecté' : 'Stripe en mode test à connecter')+' · '+
     (state.printful ? 'Printful connecté' : 'Printful à connecter')+
@@ -272,7 +278,18 @@ async function syncCatalog() {
   }
 }
 get('sync-catalog').onclick = syncCatalog;
-tab(new URLSearchParams(location.search).get('tab') === 'printful' ? 'printful' : 'products');
+get('stripe-form').onsubmit = event=>{
+  event.preventDefault();
+  const stripeForm = event.currentTarget;
+  return run(event.submitter,async ()=>{
+    await api('stripe',{key:stripeForm.elements.key.value});
+    stripeForm.reset();
+    await refresh();
+    notice('Stripe est connecté en mode test.','success');
+  });
+};
+const initialTab = new URLSearchParams(location.search).get('tab');
+tab(['products','settings','profile','printful','orders'].includes(initialTab) ? initialTab : 'products');
 run(null,async ()=>{
   await refresh();
   if (!get('products').hidden) await syncCatalog();

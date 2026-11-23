@@ -244,7 +244,7 @@ async function renderStorefront(request,env) {
   else main = '<article class="shop-section info-page"><h1>'+htmlEscape(heading)+'</h1>'+
     (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+'</article>';
   const client = {
-    language:en?'en':'fr',stripe:stripeEnabled(env),countries:settings.countries,
+    language:en?'en':'fr',stripe:await stripeEnabled(env),countries:settings.countries,
     shipping:profile.shipping ?? {},shippingPath:languagePath('/livraison-retours',en),
     products:published.map(({id,name,price,material,variants})=>({id,name,price,material,variants:variants.map(({id,size,color,label})=>({id,size,color,label}))}))
   };

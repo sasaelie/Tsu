@@ -1,12 +1,16 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/index.js"></script></head>
 <body><header><a href="/">TSŪ <span>Boutique</span></a><a href="/compte"><span>Mon compte</span></a></header>
 <main><h1>Gérer TSŪ</h1><p id="identity"></p><p id="notice" role="status" aria-live="polite"></p>
-<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button></nav>
+<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button></nav>
 <section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
 <label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="acc">Accessoire</option></select></label>
 <label>Prix en euros <input name="price" type="number" min="0.50" max="9999" step="0.01" required></label><label>URL HTTPS de la photo <input name="image" type="url" maxlength="2048"></label>
-<label>Description française <textarea name="fr" maxlength="1500"></textarea></label><label>Description anglaise <textarea name="en" maxlength="1500"></textarea></label></div>
+<label>Description française <textarea name="fr" maxlength="1500"></textarea></label><label>Description anglaise <textarea name="en" maxlength="1500"></textarea></label>
+<label>Matière et composition <input name="material" maxlength="250"></label>
+<label>Guide des tailles <textarea name="sizing" maxlength="500"></textarea></label>
+<label>Conseils d’entretien <textarea name="care" maxlength="500"></textarea></label>
+<label>Fabricant, coordonnées et sécurité <textarea name="safety" maxlength="1200"></textarea></label></div>
 <fieldset><legend>Variantes Printful</legend><div id="variants"></div><button type="button" id="add-variant">Ajouter une variante</button></fieldset>
 <div class="checks"><label><input type="checkbox" name="published"> Publier dans la boutique</label><label><input type="checkbox" name="featured"> Mettre en avant</label></div>
 <button type="submit">Enregistrer le produit</button></form></section>
@@ -15,6 +19,36 @@
 <label>Texte français <textarea name="pitchFr" maxlength="300"></textarea></label><label>Texte anglais <textarea name="pitchEn" maxlength="300"></textarea></label></div>
 <fieldset><legend>Pays de livraison</legend><div class="checks"><label><input type="checkbox" name="be"> Belgique</label><label><input type="checkbox" name="fr"> France</label></div></fieldset>
 <button>Enregistrer la boutique</button></form></section>
+<section id="profile" hidden>
+<h2>Coordonnées et livraison</h2>
+<p>Les coordonnées enregistrées ici alimentent le footer, la page Contact et les mentions légales.</p>
+<form id="profile-form">
+<fieldset><legend>Identité du vendeur</legend><div class="fields">
+<label>Raison sociale <input name="businessName" maxlength="150"></label>
+<label>Numéro d’entreprise (BCE) <input name="businessNumber" maxlength="60"></label>
+<label>Numéro de TVA, si applicable <input name="vatNumber" maxlength="60"></label>
+<label>E-mail de contact public <input name="publicEmail" type="email" maxlength="254"></label>
+<label>Téléphone professionnel <input name="phone" type="tel" maxlength="40"></label>
+<label>Adresse professionnelle <textarea name="businessAddress" maxlength="350"></textarea></label>
+<label>Adresse de retour <textarea name="returnAddress" maxlength="350"></textarea></label>
+<label>Règlement des litiges, si applicable <textarea name="disputeInfo" maxlength="1600"></textarea></label>
+</div></fieldset>
+<fieldset><legend>Livraison standard</legend>
+<p>Le délai total inclut la fabrication et le transport. Utilise les frais que tu veux facturer par commande. Saisis 0 si tu offres les frais.</p>
+<div class="fields">
+<div><h3>Belgique</h3><label>Frais en euros <input name="BEFee" type="number" min="0" max="1000" step=".01"></label><label>Délai minimum en jours ouvrables <input name="BEMin" type="number" min="1" max="60"></label><label>Délai maximum en jours ouvrables <input name="BEMax" type="number" min="1" max="60"></label></div>
+<div><h3>France</h3><label>Frais en euros <input name="FRFee" type="number" min="0" max="1000" step=".01"></label><label>Délai minimum en jours ouvrables <input name="FRMin" type="number" min="1" max="60"></label><label>Délai maximum en jours ouvrables <input name="FRMax" type="number" min="1" max="60"></label></div>
+</div></fieldset>
+<fieldset><legend>Textes à préparer pour le lancement</legend><div class="fields">
+<label>Conditions de vente (FR) <textarea name="termsFr" maxlength="9000"></textarea></label>
+<label>Conditions de vente (EN) <textarea name="termsEn" maxlength="9000"></textarea></label>
+<label>Politique de confidentialité (FR) <textarea name="privacyFr" maxlength="9000"></textarea></label>
+<label>Politique de confidentialité (EN) <textarea name="privacyEn" maxlength="9000"></textarea></label>
+</div></fieldset>
+<button type="submit">Enregistrer les coordonnées et la livraison</button>
+<p><a href="/mentions-legales">Voir les mentions légales</a> · <a href="/livraison-retours">Voir la page Livraison et retours</a></p>
+</form>
+</section>
 <section id="printful" hidden>
 <h2>Printful</h2>
 <p id="printful-status" role="status"></p>

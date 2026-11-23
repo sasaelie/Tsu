@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS shop_profile (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL
+);

@@ -10,11 +10,14 @@ const readData = async (db, sql, ...args) => {
   return result.results.map(row => ({ ...JSON.parse(row.data), ...(row.created_at ? { createdAt: row.created_at } : {}) }));
 };
 
-async function body(request) {
+async function body(request, max = 30_000) {
   if (!request.headers.get('content-type')?.startsWith('application/json')) fail('Format JSON requis.');
   const raw = await request.text();
-  if (raw.length > 30_000) fail('Données trop volumineuses.', 413);
-  try { return JSON.parse(raw); } catch { fail('Données invalides.'); }
+  if (raw.length > max) fail('Données trop volumineuses.', 413);
+  let data;
+  try { data = JSON.parse(raw); } catch { fail('Données invalides.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) fail('Données invalides.');
+  return data;
 }
 
 function productData(input) {
@@ -44,7 +47,7 @@ function productData(input) {
   if (input.published && (!variants.length || variants.some(variant => !variant.syncId))) {
     fail('Associe chaque variante à Printful avant de publier.');
   }
-  return { id, name, price, image, type:input.type, fr:text(input.fr,1500), en:text(input.en,1500),
+  return { id, name, price, image, type:input.type, fr:text(input.fr,1500), en:text(input.en,1500), material:text(input.material,250), care:text(input.care,500), sizing:text(input.sizing,500), safety:text(input.safety,1200),
     published: Boolean(input.published), featured:Boolean(input.featured), variants };
 }
 
@@ -77,87 +80,6 @@ async function storefront(env) {
 }
 const products = env => readData(env.DB,'SELECT data FROM products ORDER BY rowid DESC');
 
-async function checkout(request, env, origin) {
-  if (!stripeEnabled(env)) fail('Stripe en mode test reste à connecter.', 503);
-  const { lines, country } = await body(request);
-  const config = await storefront(env);
-  if (!config.countries.includes(country) || !Array.isArray(lines) || !lines.length || lines.length > 20) fail('Panier ou pays invalide.');
-  const available = await products(env);
-  const items = lines.map(line => {
-    const product = available.find(item => item.id === line.id && item.published);
-    const variant = product?.variants.find(item => item.id === line.variantId);
-    if (!variant?.syncId || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 20) fail('Un article du panier est indisponible.');
-    const label = [variant.size,variant.color].filter(Boolean).join(' · ') || variant.label;
-    return { name:[product.name,label].filter(Boolean).join(' · '), price:product.price, syncId:variant.syncId, quantity:line.quantity };
-  });
-  const id = crypto.randomUUID();
-  const form = new URLSearchParams({
-    mode:'payment', success_url:origin+'/?test=retour', cancel_url:origin+'/#collection',
-    'shipping_address_collection[allowed_countries][0]':country,
-    'payment_method_types[0]':'card', client_reference_id:id
-  });
-  items.forEach((item,index) => {
-    const key = 'line_items['+index+']';
-    form.set(key+'[price_data][currency]','eur');
-    form.set(key+'[price_data][unit_amount]',String(item.price));
-    form.set(key+'[price_data][product_data][name]',item.name);
-    form.set(key+'[quantity]',String(item.quantity));
-  });
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions', {
-    method:'POST', headers:{ Authorization:'Bearer '+env.STRIPE_TEST_KEY, 'Content-Type':'application/x-www-form-urlencoded', 'Idempotency-Key':id }, body:form
-  },'Stripe');
-  if (session.livemode !== false || !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe de test invalide.',502);
-  await env.DB.prepare('INSERT INTO shop_orders (id, session_id, data) VALUES (?, ?, ?)')
-    .bind(id,session.id,JSON.stringify({ id,country,items,payment:'unpaid',printful:'none' })).run();
-  return json({ url:session.url });
-}
-
-async function syncOrder(env, id) {
-  if (!stripeEnabled(env) || !idPattern.test(id)) fail('Commande de test indisponible.');
-  const row = await env.DB.prepare('SELECT session_id, data FROM shop_orders WHERE id = ?').bind(id).first();
-  if (!row) fail('Commande introuvable.',404);
-  const order = JSON.parse(row.data);
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(row.session_id),{
-    headers:{Authorization:'Bearer '+env.STRIPE_TEST_KEY}
-  },'Stripe');
-  if (session.livemode !== false || session.client_reference_id !== id) fail('Session Stripe invalide.',502);
-  const expected = order.items.reduce((sum,item)=>sum+item.price*item.quantity,0);
-  if (session.amount_total !== expected || session.currency !== 'eur') fail('Le total Stripe ne correspond pas à la commande.',502);
-  order.payment = session.payment_status === 'paid' ? 'paid' : session.status === 'expired' ? 'expired' : 'unpaid';
-  if (order.payment === 'paid' && await activePrintful(env)) {
-    const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
-    const address = shipping?.address;
-    if (!address?.line1 || !address.postal_code || !address.city || address.country !== order.country || !shipping.name) fail('Adresse de livraison incomplète.');
-    try {
-      let draft;
-      const externalId = 'tsu-'+id;
-      try { draft = await printful(env,'/orders/@'+externalId); }
-      catch (error) {
-        if (error.providerStatus !== 404) throw error;
-        try {
-          draft = await printful(env,'/orders?confirm=false',{
-            external_id:externalId,
-            recipient:{ name:shipping.name,address1:address.line1,address2:address.line2 ?? '',
-              city:address.city,country_code:address.country,zip:address.postal_code },
-            items:order.items.map(item=>({ sync_variant_id:item.syncId,quantity:item.quantity }))
-          });
-        } catch (createError) {
-          if (![400,409].includes(createError.providerStatus)) throw createError;
-          draft = await printful(env,'/orders/@'+externalId);
-        }
-      }
-      order.printful = draft.status;
-      order.printfulId = draft.id;
-      order.error = '';
-      order.shipments = (draft.shipments ?? []).map(shipment=>({ number:shipment.tracking_number, url:shipment.tracking_url }));
-    } catch (error) {
-      order.error = error.status ? error.message : 'Impossible de joindre Printful.';
-    }
-  }
-  await env.DB.prepare('UPDATE shop_orders SET data = ? WHERE id = ?').bind(JSON.stringify(order),id).run();
-  return json(order);
-}
-
 async function handle(request, env) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
@@ -179,6 +101,9 @@ async function handle(request, env) {
   }
   if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);
   if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin',302);
+  if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || storefrontRoute(pathname))) {
+    return renderStorefront(request,env);
+  }
   if (method === 'GET' && Object.hasOwn(assets,pathname)) {
     const [type, data] = assets[pathname];
     return new Response(Uint8Array.from(atob(data), char=>char.charCodeAt(0)),{
@@ -195,9 +120,10 @@ async function handle(request, env) {
   if (method === 'POST' && pathname === '/api/checkout' && owner) return checkout(request,env,origin);
   if (method === 'POST' && pathname === '/api/admin/printful/import') return importPrintfulPage(env,(await body(request)).offset);
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
+  if (method === 'POST' && pathname === '/api/admin/profile') return saveShopProfile(request,env);
   if (method === 'GET' && pathname === '/api/admin/state') {
     const connection = await readPrintfulConnection(env);
-    return json({ email, products:await products(env), settings:await storefront(env), stripe:stripeEnabled(env),
+    return json({ email, products:await products(env), settings:await storefront(env), profile:await shopProfile(env), stripe:stripeEnabled(env),
       printful:Boolean(connection || env.PRINTFUL_TOKEN), printfulStore:connection?.store_name, orders:await readData(env.DB,'SELECT created_at, data FROM shop_orders ORDER BY created_at DESC LIMIT 100') });
   }
   if (method === 'POST' && pathname === '/api/admin/products') {

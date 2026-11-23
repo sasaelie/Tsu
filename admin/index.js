@@ -1,6 +1,7 @@
 const get = id => document.getElementById(id);
 const form = get('product-form');
 const settingsForm = get('settings-form');
+const profileForm = get('profile-form');
 let state;
 let syncing = false;
 const euro = cents => new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(cents/100);
@@ -58,7 +59,7 @@ function variantRow(variant = {}) {
 }
 function editProduct(product = {}) {
   form.reset();
-  for (const key of ['id','name','image','fr','en']) form.elements[key].value = product[key] ?? '';
+  for (const key of ['id','name','image','fr','en','material','care','sizing','safety']) form.elements[key].value = product[key] ?? '';
   form.elements.type.value = product.type ?? 'tee';
   form.elements.price.value = product.price ? (product.price/100).toFixed(2) : '';
   for (const key of ['published','featured']) form.elements[key].checked = Boolean(product[key]);
@@ -105,6 +106,7 @@ async function refresh() {
   get('sync-catalog').hidden = !state.printful;
   get('catalog-sync-status').hidden = !state.printful;
   refreshSettings();
+  populateProfile();
   renderOrders();
 }
 function renderProducts() {
@@ -180,6 +182,37 @@ form.onsubmit = event=>{
     form.hidden = true;
     await refresh();
     notice(data.published ? 'Produit publié.' : 'Produit enregistré.','success');
+  });
+};
+const profileKeys = [
+  'businessName','businessNumber','vatNumber','businessAddress','publicEmail','phone',
+  'returnAddress','disputeInfo','termsFr','termsEn','privacyFr','privacyEn'
+];
+function populateProfile() {
+  const profile = state.profile ?? {};
+  for (const key of profileKeys) profileForm.elements[key].value = profile[key] ?? '';
+  for (const country of ['BE','FR']) {
+    const rule = profile.shipping?.[country];
+    profileForm.elements[country+'Fee'].value = rule ? (rule.fee/100).toFixed(2) : '';
+    profileForm.elements[country+'Min'].value = rule?.min ?? '';
+    profileForm.elements[country+'Max'].value = rule?.max ?? '';
+  }
+}
+profileForm.onsubmit = event=>{
+  event.preventDefault();
+  const formData = new FormData(profileForm);
+  const data = Object.fromEntries(profileKeys.map(key=>[key,formData.get(key)]));
+  data.shipping = {};
+  return run(event.submitter,async ()=>{
+    for (const country of ['BE','FR']) {
+      const [fee,min,max] = ['Fee','Min','Max'].map(key=>formData.get(country+key));
+      if ([fee,min,max].every(value=>value==='')) continue;
+      if ([fee,min,max].some(value=>value==='')) throw new Error('Renseigne les frais et les deux délais pour chaque destination configurée.');
+      data.shipping[country] = {fee:Math.round(Number(fee)*100),min:Number(min),max:Number(max)};
+    }
+    state.profile = await api('profile',data);
+    populateProfile();
+    notice('Coordonnées et livraison mises à jour.','success');
   });
 };
 settingsForm.onsubmit = event=>{

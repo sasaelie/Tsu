@@ -4,7 +4,11 @@ const settingsForm = get('settings-form');
 let state;
 let syncing = false;
 const euro = cents => new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(cents/100);
-const notice = message => { get('notice').textContent = message; };
+function feedback(node, message, tone = 'neutral') {
+  node.dataset.tone = tone;
+  node.textContent = message;
+}
+const notice = (message, tone) => feedback(get('notice'),message,tone);
 
 async function api(route = 'state', data) {
   const response = await fetch('/api/admin/'+route,data ? {
@@ -17,7 +21,7 @@ async function api(route = 'state', data) {
 async function run(button, action) {
   if (button) button.disabled = true;
   notice('');
-  try { await action(); } catch (error) { notice(error.message); }
+  try { await action(); } catch (error) { notice(error.message,'error'); }
   finally { if (button) button.disabled = false; }
 }
 function element(tag, value, className) {
@@ -89,7 +93,7 @@ function renderOrders() {
     row.append(details,button('Synchroniser', control=>run(control,async ()=>{
       const result = await api('orders/sync',{id:order.id});
       await refresh();
-      notice(result.error || 'Commande synchronisée.');
+      notice(result.error || 'Commande synchronisée.',result.error ? 'error' : 'success');
     })));
     list.append(row);
   }
@@ -133,7 +137,7 @@ function renderProducts() {
       controls.append(button('Valider et publier',control=>run(control,async ()=>{
         await api('products',{...product,published:true});
         await refresh();
-        notice(product.name+' est visible dans '+category+'.');
+        notice(product.name+' est visible dans '+category+'.','success');
       })));
     }
     row.append(title,controls);
@@ -175,7 +179,7 @@ form.onsubmit = event=>{
     await api('products',data);
     form.hidden = true;
     await refresh();
-    notice('Produit enregistré.');
+    notice(data.published ? 'Produit publié.' : 'Produit enregistré.','success');
   });
 };
 settingsForm.onsubmit = event=>{
@@ -184,7 +188,7 @@ settingsForm.onsubmit = event=>{
   data.countries = [data.be && 'BE',data.fr && 'FR'].filter(Boolean);
   return run(event.submitter,async ()=>{
     await api('settings',data);
-    notice('Boutique mise à jour.');
+    notice('Boutique mise à jour.','success');
   });
 };
 get('open-products').onclick = ()=>{
@@ -198,7 +202,7 @@ get('printful-form').onsubmit = event=>{
     const {store} = await api('printful',{token:form.elements.token.value});
     form.reset();
     await refresh();
-    notice('Printful connecté à '+store+'.');
+    notice('Printful connecté à '+store+'.','success');
   });
 };
 async function syncCatalog() {
@@ -207,7 +211,7 @@ async function syncCatalog() {
   const control = get('sync-catalog');
   const status = get('catalog-sync-status');
   control.disabled = true;
-  status.textContent = 'Recherche de nouveaux produits Printful…';
+  feedback(status,'Recherche de nouveaux produits Printful…');
   let added = 0;
   let failed = 0;
   let total;
@@ -223,11 +227,12 @@ async function syncCatalog() {
     const latest = await api();
     state.products = latest.products;
     renderProducts();
-    status.textContent = added ? added+' nouveau(x) produit(s) en brouillon.' :
+    const summary = added ? added+' nouveau(x) produit(s) en brouillon.' :
       total === 0 ? 'Aucun produit disponible dans ta boutique Printful.' : 'Aucun nouveau produit à importer.';
-    if (failed) status.textContent += ' '+failed+' fiche(s) n’ont pas pu être lues. Tu peux actualiser.';
+    const details = failed ? ' '+failed+' fiche(s) n’ont pas pu être lues. Tu peux actualiser.' : '';
+    feedback(status,summary+details,failed ? 'error' : added ? 'success' : 'neutral');
   } catch (error) {
-    status.textContent = error.message;
+    feedback(status,error.message,'error');
   } finally {
     syncing = false;
     control.disabled = false;

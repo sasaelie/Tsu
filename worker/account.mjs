@@ -63,7 +63,7 @@ async function accountRoute(request, env, action, subject, platformEmail) {
   if (action === 'state' && request.method === 'GET') {
     const account = await ownerSession(request,env,subject);
     const record = await ownerRecord(env);
-    return json({hasOwner:Boolean(record),signedIn:Boolean(account),email:account?.email});
+    return json({hasOwner:Boolean(record),signedIn:Boolean(account),email:account?.email ?? email});
   }
   if (request.method !== 'POST') return json({error:'Méthode refusée.'},405);
   if (action === 'logout') {
@@ -75,7 +75,9 @@ async function accountRoute(request, env, action, subject, platformEmail) {
   if (!env.TSU_AUTH_PEPPER) return json({error:'La connexion TSŪ est momentanément indisponible.'},503);
   const input = await body(request);
   const password = input?.password;
-  if (normalizedEmail(input?.email) !== email || email.length > 254 || typeof password !== 'string' || !password || password.length > 128) {
+  if ((!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) ||
+      typeof password !== 'string' || !password || password.length > 128 ||
+      (action === 'login' && normalizedEmail(input?.email) !== email)) {
     return json({error:'Adresse e-mail ou mot de passe invalide.'},400);
   }
   const owner = await ownerRecord(env);

@@ -157,5 +157,5 @@ get('printful-form').onsubmit = event=>{
     notice('Printful connecté à '+store+'.');
   });
 };
-tab('products');
+tab(new URLSearchParams(location.search).get('tab') === 'printful' ? 'printful' : 'products');
 run(null,refresh);

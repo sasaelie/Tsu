@@ -1,5 +1,8 @@
 const get = id => document.getElementById(id);
 const form = get('auth');
+const directToPrintful = new URLSearchParams(location.search).get('destination') === 'printful';
+const adminPath = directToPrintful ? '/admin?tab=printful' : '/admin';
+get('admin-link').href = adminPath;
 let mode = 'login';
 let hasOwner = false;
 
@@ -21,7 +24,7 @@ function selectMode(next) {
   form.elements.password.autocomplete = register ? 'new-password' : 'current-password';
   form.elements.password.value = '';
   get('explanation').textContent = register
-    ? 'Pour créer le compte propriétaire en préproduction, utilise l’adresse e-mail de ton compte ChatGPT actuellement connecté.'
+    ? 'L’adresse du compte propriétaire est reprise automatiquement. Choisis ton mot de passe TSŪ.'
     : 'Utilise l’adresse et le mot de passe de ton compte TSŪ.';
   document.querySelectorAll('[data-mode]').forEach(button=>{
     if (button.dataset.mode === next) button.setAttribute('aria-current','true');
@@ -38,6 +41,7 @@ async function run(button, action) {
 async function refresh() {
   const account = await request('state');
   hasOwner = account.hasOwner;
+  form.elements.email.value = account.email ?? '';
   get('guest').hidden = Boolean(account.signedIn);
   get('signed-in').hidden = !account.signedIn;
   get('email').textContent = account.email ?? '';
@@ -50,8 +54,7 @@ form.onsubmit = event=>{
   return run(event.submitter,async ()=>{
     const values = Object.fromEntries(new FormData(form));
     await request(mode, values);
-    form.reset();
-    await refresh();
+    location.assign(adminPath);
   });
 };
 get('logout').onclick = event=>run(event.currentTarget,async ()=>{

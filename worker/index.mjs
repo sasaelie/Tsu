@@ -157,7 +157,7 @@ async function syncOrder(env, id) {
 }
 
 async function handle(request, env) {
-  const { pathname, origin } = new URL(request.url);
+  const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
@@ -166,13 +166,13 @@ async function handle(request, env) {
   // The private Sites gate verifies the owner before the separate TSŪ login.
   if ((admin || account) && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
     return owner ? json({ error:'Accès réservé au propriétaire.' },403)
-      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname),302)
+      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname + (pathname === '/admin' && searchParams.get('tab') === 'printful' ? '?tab=printful' : '')),302)
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
   if (pathname.startsWith('/api/account/')) return accountRoute(request,env,pathname.slice('/api/account/'.length),owner,email);
   if (admin && pathname !== '/admin/style.css' && !await ownerSession(request,env,owner)) {
-    return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte',302)
+    return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(searchParams.get('tab') === 'printful' ? '?destination=printful' : ''),302)
       : json({error:'Connecte-toi à ton compte TSŪ.'},401);
   }
   if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);

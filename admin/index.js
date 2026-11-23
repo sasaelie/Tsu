@@ -71,7 +71,7 @@ function editProduct(product = {}) {
 }
 function renderOrders() {
   get('stripe-settings-label').textContent = state.stripe ? 'Remplacer la clé de test Stripe' : 'Connecter Stripe en mode test';
-  get('stripe-settings').open = !state.stripe;
+  if (!state.stripe) get('stripe-settings').open = true;
   const ready = state.settings.countries.some(country=>state.profile?.shipping?.[country]);
   get('stripe-readiness').textContent = state.stripe && !ready
     ? 'Renseigne les frais et les délais pour au moins un pays dans Coordonnées et livraison afin d’essayer le paiement.'
@@ -278,15 +278,28 @@ async function syncCatalog() {
   }
 }
 get('sync-catalog').onclick = syncCatalog;
-get('stripe-form').onsubmit = event=>{
+get('stripe-form').onsubmit = async event=>{
   event.preventDefault();
-  const stripeForm = event.currentTarget;
-  return run(event.submitter,async ()=>{
-    await api('stripe',{key:stripeForm.elements.key.value});
-    stripeForm.reset();
+  const form = event.currentTarget;
+  const button = event.submitter;
+  const result = get('stripe-result');
+  button.disabled = true;
+  let saved = false;
+  feedback(result,'Vérification en cours…');
+  try {
+    await api('stripe',{key:form.elements.key.value});
+    form.reset();
+    feedback(result,'Stripe est connecté en mode test.','success');
+    saved = true;
     await refresh();
-    notice('Stripe est connecté en mode test.','success');
-  });
+  } catch (error) {
+    form.elements.key.focus({preventScroll:true});
+    feedback(result,saved
+      ? 'Clé enregistrée. Actualise la page pour voir le statut.'
+      : error.message,saved ? 'success' : 'error');
+  } finally {
+    button.disabled = false;
+  }
 };
 const initialTab = new URLSearchParams(location.search).get('tab');
 tab(['products','settings','profile','printful','orders'].includes(initialTab) ? initialTab : 'products');

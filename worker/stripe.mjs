@@ -32,12 +32,21 @@ async function stripeRequest(key, path, form, idempotencyKey) {
   },'Stripe');
 }
 
+function stripeKeyInputError(token) {
+  if (token.startsWith('pk_')) return 'Tu as saisi une clé publique (pk_). Utilise une clé restreinte de test (rk_test_).';
+  if (/^(?:rk|sk)_live_/.test(token)) return 'Cette clé appartient au mode réel. Utilise une clé restreinte de test (rk_test_).';
+  if (token.startsWith('sk_test_')) return 'Cette clé secrète n’est pas restreinte. Crée une clé de test qui commence par rk_test_.';
+  if (!token.startsWith('rk_test_') || !stripeTestKeyPattern.test(token)) {
+    return 'Colle la clé restreinte de test complète. Elle commence par rk_test_.';
+  }
+  return '';
+}
+
 async function saveStripeConnection(request, env) {
   const {key:input} = await body(request);
   const token = text(input,510);
-  if (!token.startsWith('rk_test_') || !stripeTestKeyPattern.test(token)) {
-    fail('Saisis une clé API restreinte de test commençant par rk_test_.');
-  }
+  const message = stripeKeyInputError(token);
+  if (message) fail(message);
   const key = await credentialKey(env.TSU_STRIPE_ENCRYPTION_KEY,'Stripe');
   let list;
   try { list = await stripeRequest(token,'/checkout/sessions?limit=1'); }

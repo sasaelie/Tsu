@@ -55,3 +55,4 @@ textarea { resize: vertical; }
 }
 #stripe-settings summary{padding:.45rem 0;color:#2435a7;cursor:pointer;width:fit-content}
 #stripe-form button{margin-top:.85rem}
+#stripe-result:not(:empty){padding:.65rem;margin:.65rem 0 0}

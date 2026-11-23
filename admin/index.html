@@ -1,7 +1,7 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/index.js"></script></head>
 <body><header><a href="/">TSŪ <span>Boutique</span></a><a href="/compte"><span>Mon compte</span></a></header>
 <main><h1>Gérer TSŪ</h1><p id="identity"></p><p id="notice" role="status" aria-live="polite"></p>
-<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="orders">Commandes et tests</button></nav>
+<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button></nav>
 <section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
 <label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type"><option value="tee">T-shirt</option><option value="acc">Accessoire</option></select></label>
@@ -15,5 +15,6 @@
 <label>Texte français <textarea name="pitchFr" maxlength="300"></textarea></label><label>Texte anglais <textarea name="pitchEn" maxlength="300"></textarea></label></div>
 <fieldset><legend>Pays de livraison</legend><div class="checks"><label><input type="checkbox" name="be"> Belgique</label><label><input type="checkbox" name="fr"> France</label></div></fieldset>
 <button>Enregistrer la boutique</button></form></section>
+<section id="printful" hidden><h2>Connexion Printful</h2><p id="printful-status"></p><p>Crée un jeton privé pour une seule boutique dans le <a href="https://developers.printful.com/tokens/add-new-token" target="_blank" rel="noopener noreferrer">portail Printful</a>. Autorise la lecture des produits synchronisés et la gestion des commandes.</p><form id="printful-form"><label>Jeton privé Printful <input name="token" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required></label><p>Le test vérifie la lecture du catalogue et des commandes.</p><button type="submit">Tester et connecter</button></form></section>
 <section id="orders" hidden><h2>Commandes et tests</h2><p id="connections"></p><div class="heading"><button id="refresh-orders">Actualiser les commandes</button><a href="/#collection">Ouvrir le catalogue</a></div><div id="order-list"></div></section>
 </main></body></html>

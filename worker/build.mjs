@@ -17,4 +17,4 @@ const assets = Object.fromEntries([
   ['/admin/index.js', 'admin/index.js', 'text/javascript; charset=utf-8']
 ].map(([url, file, type]) => [url, [type, readFileSync(file).toString('base64')]]));
 
-writeFileSync('dist/server/index.js', 'const assets = ' + JSON.stringify(assets) + ';\n' + readFileSync('worker/account.mjs','utf8') + '\n' + readFileSync('worker/index.mjs','utf8'));
+writeFileSync('dist/server/index.js', 'const assets = ' + JSON.stringify(assets) + ';\n' + readFileSync('worker/account.mjs','utf8') + '\n' + readFileSync('worker/printful.mjs','utf8') + '\n' + readFileSync('worker/index.mjs','utf8'));

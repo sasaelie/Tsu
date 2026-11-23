@@ -57,11 +57,14 @@ async function provider(url, options, label) {
   return response.json();
 }
 
-async function printful(env, path, payload) {
+async function printful(env, path, payload, config) {
+  const connection = config ?? await activePrintful(env);
+  if (!connection) fail('Printful reste à connecter.',503);
   return (await provider('https://api.printful.com'+path, {
     method: payload ? 'POST' : 'GET',
-    headers: { Authorization:'Bearer '+env.PRINTFUL_TOKEN,
-      ...(env.PRINTFUL_STORE_ID ? { 'X-PF-Store-Id':env.PRINTFUL_STORE_ID } : {}),
+    redirect: 'error',
+    headers: { Authorization:'Bearer '+connection.token,
+      ...(connection.storeId ? { 'X-PF-Store-Id':connection.storeId } : {}),
       ...(payload ? { 'Content-Type':'application/json' } : {}) },
     body: payload ? JSON.stringify(payload) : undefined
   },'Printful')).result;
@@ -119,7 +122,7 @@ async function syncOrder(env, id) {
   const expected = order.items.reduce((sum,item)=>sum+item.price*item.quantity,0);
   if (session.amount_total !== expected || session.currency !== 'eur') fail('Le total Stripe ne correspond pas à la commande.',502);
   order.payment = session.payment_status === 'paid' ? 'paid' : session.status === 'expired' ? 'expired' : 'unpaid';
-  if (order.payment === 'paid' && env.PRINTFUL_TOKEN) {
+  if (order.payment === 'paid' && await activePrintful(env)) {
     const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
     const address = shipping?.address;
     if (!address?.line1 || !address.postal_code || !address.city || address.country !== order.country || !shipping.name) fail('Adresse de livraison incomplète.');
@@ -188,13 +191,15 @@ async function handle(request, env) {
     return json({ items, settings, stripe:stripeEnabled(env) });
   }
   if (method === 'POST' && pathname === '/api/checkout' && owner) return checkout(request,env,origin);
+  if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
   if (method === 'GET' && pathname === '/api/admin/state') {
+    const connection = await readPrintfulConnection(env);
     return json({ email, products:await products(env), settings:await storefront(env), stripe:stripeEnabled(env),
-      printful:Boolean(env.PRINTFUL_TOKEN), orders:await readData(env.DB,'SELECT created_at, data FROM shop_orders ORDER BY created_at DESC LIMIT 100') });
+      printful:Boolean(connection || env.PRINTFUL_TOKEN), printfulStore:connection?.store_name, orders:await readData(env.DB,'SELECT created_at, data FROM shop_orders ORDER BY created_at DESC LIMIT 100') });
   }
   if (method === 'POST' && pathname === '/api/admin/products') {
     const product = productData(await body(request));
-    if (product.published && env.PRINTFUL_TOKEN) {
+    if (product.published && await activePrintful(env)) {
       for (const variant of product.variants) {
         const result = await printful(env,'/store/variants/'+variant.syncId);
         if (!result.sync_variant?.synced) fail('Une variante Printful est introuvable ou non synchronisée.');

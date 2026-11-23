@@ -108,6 +108,7 @@ async function refresh() {
   for(const key of ['tagFr','tagEn','pitchFr','pitchEn']) settingsForm.elements[key].value = state.settings[key] ?? '';
   settingsForm.elements.be.checked = state.settings.countries.includes('BE');
   settingsForm.elements.fr.checked = state.settings.countries.includes('FR');
+  get('printful-status').textContent = state.printful ? 'Connecté à '+(state.printfulStore ?? 'Printful')+'.' : 'Printful à connecter.';
   renderOrders();
 }
 function tab(id) {
@@ -144,6 +145,16 @@ settingsForm.onsubmit = event=>{
   return run(event.submitter,async ()=>{
     await api('settings',data);
     notice('Boutique mise à jour.');
+  });
+};
+get('printful-form').onsubmit = event=>{
+  event.preventDefault();
+  const form = event.currentTarget;
+  return run(event.submitter,async ()=>{
+    const {store} = await api('printful',{token:form.elements.token.value});
+    form.reset();
+    await refresh();
+    notice('Printful connecté à '+store+'.');
   });
 };
 tab('products');

@@ -36,7 +36,7 @@ function importVariant(variant) {
   if (!Number.isSafeInteger(syncId) || syncId < 1 || !variant.synced || variant.is_ignored === true) return null;
   const parts = /\(([^()]+)\s+\/\s+([^()]+)\)$/.exec(variant.product?.name ?? '');
   return {
-    id:'pfv-'+syncId, syncId, catalogId:Number(variant.variant_id) || undefined,
+    id:'pfv-'+syncId, syncId, catalogId:Number(variant.variant_id ?? variant.product?.variant_id) || undefined,
     size:text(variant.size || parts?.[2],32),
     color:text(variant.color || parts?.[1],40),
     label:text(variant.name,100)
@@ -111,12 +111,17 @@ async function validatePrintfulVariants(env, product) {
   if (!connection) return;
   if (/^pf-\d+$/.test(product.id)) {
     const result = await printful(env,'/store/products/'+product.id.slice(3),undefined,connection);
-    const valid = new Set((result.sync_variants ?? []).map(importVariant).filter(Boolean).map(variant=>variant.syncId));
-    if (product.variants.some(variant=>!valid.has(variant.syncId))) fail('Une variante Printful de ce produit n’est plus synchronisée.');
+    const valid = new Map((result.sync_variants ?? []).map(importVariant).filter(Boolean).map(variant=>[variant.syncId,variant]));
+    for (const variant of product.variants) {
+      if (!valid.has(variant.syncId)) fail('Une variante Printful de ce produit n’est plus synchronisée.');
+      variant.catalogId = valid.get(variant.syncId).catalogId;
+    }
     return;
   }
   for (const variant of product.variants) {
     const result = await printful(env,'/store/variants/'+variant.syncId,undefined,connection);
-    if (!importVariant(result.sync_variant ?? result)) fail('Une variante Printful est introuvable ou non synchronisée.');
+    const valid = importVariant(result.sync_variant ?? result);
+    if (!valid) fail('Une variante Printful est introuvable ou non synchronisée.');
+    variant.catalogId = valid.catalogId;
   }
 }

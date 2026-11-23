@@ -6,7 +6,8 @@ async function deliveryDates(env, items, country, zip) {
   const variants = new Map(items.filter(item=>item.catalogId).map(item=>[item.syncId,item.catalogId]));
   await Promise.all([...new Set(items.map(item=>item.syncId))].filter(id=>!variants.has(id)).map(async id=>{
     const data = await printful(env,'/store/variants/'+id,undefined,config);
-    const catalogId = Number(data?.sync_variant?.variant_id);
+    const variant = data?.sync_variant ?? data;
+    const catalogId = Number(variant?.variant_id ?? variant?.product?.variant_id);
     if (Number.isSafeInteger(catalogId) && catalogId>0) variants.set(id,catalogId);
   }));
   if (items.some(item=>!variants.has(item.syncId))) return null;
@@ -26,7 +27,10 @@ async function deliveryDates(env, items, country, zip) {
 
 async function findDeliveryDates(env,items,country,zip) {
   try { return await deliveryDates(env,items,country,zip); }
-  catch { return null; }
+  catch (error) {
+    console.warn('Printful delivery estimate unavailable',country,error.providerStatus ?? error.name);
+    return null;
+  }
 }
 
 function deliveryZip(value,country) {

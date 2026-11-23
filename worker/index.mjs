@@ -62,7 +62,7 @@ async function printful(env, path, payload, config) {
   if (!connection) fail('Printful reste à connecter.',503);
   return (await provider('https://api.printful.com'+path, {
     method: payload ? 'POST' : 'GET',
-    redirect: 'error',
+    redirect: 'manual',
     headers: { Authorization:'Bearer '+connection.token,
       ...(connection.storeId ? { 'X-PF-Store-Id':connection.storeId } : {}),
       ...(payload ? { 'Content-Type':'application/json' } : {}) },

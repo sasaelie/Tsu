@@ -138,7 +138,8 @@ function shippingContent(settings,profile,en) {
       (rule ? storefrontMoney(rule.fee,en) : local(en,'À confirmer','To be confirmed'))+'</td><td>'+
       (rule ? rule.min+'–'+rule.max+' '+local(en,'jours ouvrables','business days') : local(en,'À confirmer','To be confirmed'))+'</td></tr>';
   }).join('');
-  return '<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Les délais du tableau couvrent la fabrication et le transport.',
+  const preview = profile.shippingPreview ? '<p><strong>'+local(en,'Tarifs provisoires de test','Provisional test rates')+'</strong></p>' : '';
+  return preview+'<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Les délais du tableau couvrent la fabrication et le transport.',
     'Each item is made after you order. Printful typically estimates 2–5 business days for production, plus transit time. The times in the table cover production and transit.')+'</p>'+
     '<div class="table-wrap"><table><thead><tr><th scope="col">'+local(en,'Destination','Destination')+'</th><th scope="col">'+local(en,'Livraison standard','Standard shipping')+
     '</th><th scope="col">'+local(en,'Délai total estimé','Estimated total time')+'</th></tr></thead><tbody>'+rules+'</tbody></table></div>'+

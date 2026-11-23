@@ -196,6 +196,7 @@ const profileKeys = [
 ];
 function populateProfile() {
   const profile = state.profile ?? {};
+  get('trial-shipping-note').hidden = !profile.shippingPreview;
   for (const key of profileKeys) profileForm.elements[key].value = profile[key] ?? '';
   for (const country of ['BE','FR']) {
     const rule = profile.shipping?.[country];

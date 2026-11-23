@@ -159,18 +159,25 @@ async function handle(request, env) {
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
-  // Sites restricts this deployment to its owner. Require visitor identity in addition to the private ingress.
-  if (admin && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
+  const account = pathname === '/compte' || pathname.startsWith('/compte/') || pathname.startsWith('/api/account/');
+  // The private Sites gate verifies the owner before the separate TSŪ login.
+  if ((admin || account) && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
     return owner ? json({ error:'Accès réservé au propriétaire.' },403)
-      : pathname === '/admin' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo=%2Fadmin',302)
+      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname),302)
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
+  if (pathname.startsWith('/api/account/')) return accountRoute(request,env,pathname.slice('/api/account/'.length),owner,email);
+  if (admin && pathname !== '/admin/style.css' && !await ownerSession(request,env,owner)) {
+    return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte',302)
+      : json({error:'Connecte-toi à ton compte TSŪ.'},401);
+  }
+  if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);
   if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin',302);
   if (method === 'GET' && Object.hasOwn(assets,pathname)) {
     const [type, data] = assets[pathname];
     return new Response(Uint8Array.from(atob(data), char=>char.charCodeAt(0)),{
-      headers: {'Content-Type':type,'X-Content-Type-Options':'nosniff', 'Cache-Control': admin ? 'no-store' : 'no-cache'}
+      headers: {'Content-Type':type,'X-Content-Type-Options':'nosniff', 'Cache-Control': admin || account ? 'no-store' : 'no-cache'}
     });
   }
   if (method === 'GET' && pathname === '/api/catalog') {

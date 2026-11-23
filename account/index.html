@@ -1,0 +1,11 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mon compte TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/compte/index.js"></script></head>
+<body><header><a href="/">TSŪ <span>Boutique</span></a><strong>Mon compte</strong></header>
+<main><h1>Mon compte TSŪ</h1><p id="notice" role="status"></p>
+<section id="guest" hidden><div class="heading"><button type="button" data-mode="register">Créer un compte</button><button type="button" data-mode="login">Se connecter</button></div>
+<form id="auth"><h2 id="form-title"></h2><p id="explanation"></p><div class="fields">
+<label>Adresse e-mail <input type="email" name="email" autocomplete="username" maxlength="254" required></label>
+<label>Mot de passe <input type="password" name="password" maxlength="128" required></label></div>
+<p id="password-hint">Choisis un mot de passe unique de 15 caractères ou plus.</p><button type="submit" id="submit"></button>
+</form></section>
+<section id="signed-in" hidden><h2>Espace propriétaire</h2><p id="email"></p><div class="heading"><a href="/admin">Ouvrir l’administration</a><button type="button" id="logout">Se déconnecter</button></div></section>
+</main></body></html>

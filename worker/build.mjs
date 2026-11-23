@@ -10,9 +10,11 @@ const assets = Object.fromEntries([
   ['/style.css', 'dist/style.css', 'text/css; charset=utf-8'],
   ['/shop.js', 'dist/shop.js', 'text/javascript; charset=utf-8'],
   ['/room.webp', 'dist/room.webp', 'image/webp'],
+  ['/compte', 'account/index.html', 'text/html; charset=utf-8'],
+  ['/compte/index.js', 'account/index.js', 'text/javascript; charset=utf-8'],
   ['/admin', 'admin/index.html', 'text/html; charset=utf-8'],
   ['/admin/style.css', 'admin/style.css', 'text/css; charset=utf-8'],
   ['/admin/index.js', 'admin/index.js', 'text/javascript; charset=utf-8']
 ].map(([url, file, type]) => [url, [type, readFileSync(file).toString('base64')]]));
 
-writeFileSync('dist/server/index.js', 'const assets = ' + JSON.stringify(assets) + ';\n' + readFileSync('worker/index.mjs','utf8'));
+writeFileSync('dist/server/index.js', 'const assets = ' + JSON.stringify(assets) + ';\n' + readFileSync('worker/account.mjs','utf8') + '\n' + readFileSync('worker/index.mjs','utf8'));

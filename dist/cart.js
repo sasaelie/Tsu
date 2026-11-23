@@ -36,6 +36,15 @@ export function createCart(products, onUpdate) {
       save();
       return true;
     },
+    removePurchased(lines) {
+      for (const line of lines) {
+        const index = items.findIndex(item=>item.id===line.id && item.variantId===line.variantId);
+        if (index === -1) continue;
+        items[index].quantity -= line.quantity;
+        if (items[index].quantity <= 0) items.splice(index,1);
+      }
+      save();
+    },
     change(index,delta) {
       const item = items[index];
       if (!item) return;

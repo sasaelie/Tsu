@@ -8,6 +8,7 @@ const amount = cents=>new Intl.NumberFormat(english?'en-IE':'fr-BE',{style:'curr
 const modal = get('checkout');
 const content = get('cartContent');
 const cart = createCart(config.products,count=>{get('count').textContent=count;});
+const pendingCartKey = 'tsu-pending-cart';
 let directOrder = null;
 let country = config.countries[0];
 
@@ -87,16 +88,16 @@ function renderCheckout() {
   const shipping = config.shipping[country];
   const result = element('p',null,{class:'action-feedback',role:'status',id:'checkout-result'});
   const link = element('a',t('Livraison et retours','Shipping and returns'),{href:config.shippingPath});
-  content.append(list,label,checkoutSummary(items,shipping),element('p',t('Préproduction · Aucun paiement réel','Preview · No real payments')),link);
-  if (config.stripe && shipping) {
-    content.append(button(t('Continuer vers le paiement test','Continue to test payment'),event=>pay(event.currentTarget,items,result),{class:'primary checkout-action'}));
+  content.append(list,label,checkoutSummary(items,shipping),link);
+  if (!config.liveRequested) content.append(element('p',t('Préproduction · Aucun paiement réel','Preview · No real payments')));
+  if (config.checkoutMode && shipping) {
+    const label = config.checkoutMode === 'live' ? t('Continuer vers le paiement','Continue to payment') :
+      t('Continuer vers le paiement test','Continue to test payment');
+    content.append(button(label,event=>pay(event.currentTarget,items,result),{class:'primary checkout-action'}));
   } else {
-    const reason = shipping ? t('Stripe en mode test reste à connecter.','Stripe test mode is awaiting setup.') :
+    const reason = shipping ? t('Le paiement est momentanément indisponible.','Payment is temporarily unavailable.') :
       t('Les frais et délais de livraison de ce pays restent à configurer.','Shipping prices and times for this country are awaiting setup.');
-    content.append(element('p',reason),button(t('Simuler la commande','Simulate order'),()=>{
-      result.textContent = t('Simulation terminée. Aucun paiement ni envoi.','Simulation complete. No payment or shipment.');
-      result.dataset.tone='success';
-    },{class:'primary checkout-action'}));
+    content.append(element('p',reason));
   }
   content.append(result);
 }
@@ -106,10 +107,13 @@ async function pay(control,items,result) {
   try {
     const response = await fetch('/api/checkout',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({country,lines:items,language:config.language})
+      body:JSON.stringify({country,lines:items,language:config.language,direct:Boolean(directOrder)})
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
+    if (!directOrder) {
+      try { sessionStorage.setItem(pendingCartKey,JSON.stringify({sessionId:data.sessionId,items})); } catch {}
+    }
     location.assign(data.url);
   } catch (error) {
     result.textContent = error.message;
@@ -135,7 +139,63 @@ if (productForm) productForm.addEventListener('submit',event=>{
     get('product-feedback').dataset.tone='success';
   }
 });
-if (new URLSearchParams(location.search).get('test')==='retour') {
+function clearPurchasedCart(sessionId) {
+  try {
+    const pending = JSON.parse(sessionStorage.getItem(pendingCartKey));
+    if (pending?.sessionId === sessionId && Array.isArray(pending.items)) {
+      sessionStorage.removeItem(pendingCartKey);
+      cart.removePurchased(pending.items);
+    }
+  } catch {}
+}
+
+async function showCheckoutResult(sessionId, panel) {
+  panel.replaceChildren(element('h1',t('Vérification du paiement','Checking payment')));
+  try {
+    const response = await fetch('/api/checkout/result',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId})
+    });
+    if (!response.ok) throw new Error();
+    const order = await response.json();
+    if (order.payment === 'paid') {
+      clearPurchasedCart(sessionId);
+      panel.replaceChildren(element('h1',order.mode === 'test'
+        ? t('Paiement de test confirmé','Test payment confirmed') : t('Paiement confirmé','Payment confirmed')),
+      element('p',t('Commande','Order')+' '+order.reference),
+      element('p',t('Total payé','Total paid')+' · '+amount(order.total)));
+      panel.dataset.tone='success';
+      return;
+    }
+    if (['failed','expired'].includes(order.payment)) {
+      panel.replaceChildren(element('h1',t('Paiement non finalisé','Payment not completed')),
+        element('p',t('Tu peux retourner au panier pour réessayer.','You can return to your cart to try again.')));
+      return;
+    }
+    panel.replaceChildren(element('h1',t('Paiement en cours de confirmation','Payment confirmation pending')),
+      element('p',t('Certains moyens de paiement prennent un peu plus de temps.','Some payment methods take a little longer.')));
+  } catch {
+    panel.replaceChildren(element('h1',t('Statut momentanément indisponible','Status temporarily unavailable')),
+      element('p',t('Vérifie à nouveau le statut avant de refaire un paiement.','Check the status again before starting another payment.')));
+  }
+  panel.append(button(t('Vérifier le statut','Check status'),()=>showCheckoutResult(sessionId,panel)));
+}
+
+const checkoutParams = new URLSearchParams(location.search);
+const returnedSession = checkoutParams.get('checkout_session');
+const receiptSession = returnedSession ?? history.state?.checkoutSession;
+if (receiptSession) {
+  if (returnedSession) {
+    checkoutParams.delete('checkout_session');
+    const query = checkoutParams.toString();
+    history.replaceState({...history.state,checkoutSession:returnedSession},'',location.pathname+(query ? '?'+query : '')+location.hash);
+  }
+  const panel = element('section',null,{class:'shop-section info-page',role:'status','aria-live':'polite'});
+  get('main').replaceChildren(panel);
+  showCheckoutResult(receiptSession,panel);
+} else if (checkoutParams.get('checkout')==='cancelled') {
+  const message=element('p',t('Paiement interrompu. Tu peux reprendre ton achat.','Payment interrupted. You can resume your purchase.'),{class:'test-return',role:'status'});
+  get('main').prepend(message);
+} else if (checkoutParams.get('test')==='retour') {
   const message=element('p',t('Retour de Stripe en mode test. Le statut du paiement se vérifie dans l’administration.','Returned from Stripe test mode. Check payment status in the administration panel.'),{class:'test-return',role:'status'});
   get('main').prepend(message);
 }

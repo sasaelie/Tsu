@@ -1,9 +1,11 @@
 async function checkout(request, env, origin) {
-  if (!stripeEnabled(env)) fail('Stripe en mode test reste à connecter.', 503);
-  const { lines, country, language } = await body(request);
-  const config = await storefront(env);
+  const { lines, country, language, direct } = await body(request);
+  const [config, profile] = await Promise.all([storefront(env),shopProfile(env)]);
+  const mode = await checkoutMode(env,config,profile);
+  const stripeKey = mode === 'live' ? liveStripeKey(env) : mode === 'test' ? await activeStripeKey(env) : null;
+  if (!stripeKey) fail('Le paiement est momentanément indisponible.',503);
   if (!config.countries.includes(country) || !Array.isArray(lines) || !lines.length || lines.length > 20 || lines.some(line=>!line || typeof line !== 'object')) fail('Panier ou pays invalide.');
-  const shipping = (await shopProfile(env)).shipping?.[country];
+  const shipping = profile.shipping?.[country];
   if (!shipping) fail('Configure les frais et le délai de livraison de ce pays dans l’administration.',409);
   const available = await products(env);
   const items = lines.map(line => {
@@ -14,9 +16,15 @@ async function checkout(request, env, origin) {
     return { name:[product.name,label].filter(Boolean).join(' · '), price:product.price, syncId:variant.syncId, quantity:line.quantity };
   });
   const id = crypto.randomUUID();
+  const english = language === 'en';
+  const home = languagePath('/',english);
+  const directProduct = direct === true && lines.length === 1 ? available.find(item=>item.id === lines[0].id) : null;
+  const returnPath = directProduct ? languagePath(productPath(directProduct),english) : home;
   const form = new URLSearchParams({
-    mode:'payment', success_url:origin+'/?test=retour', cancel_url:origin+'/#collection',
-    locale:language === 'en' ? 'en' : 'fr',
+    mode:'payment', success_url:origin+home+'?checkout_session={CHECKOUT_SESSION_ID}',
+    cancel_url:origin+returnPath+'?checkout=cancelled'+(directProduct ? '' : '#collection'),
+    locale:english ? 'en' : 'fr',
+    'adaptive_pricing[enabled]':'false',
     'shipping_options[0][shipping_rate_data][type]':'fixed_amount',
     'shipping_options[0][shipping_rate_data][display_name]':language === 'en' ? 'Standard delivery' : 'Livraison standard',
     'shipping_options[0][shipping_rate_data][fixed_amount][currency]':'eur',
@@ -26,67 +34,110 @@ async function checkout(request, env, origin) {
     'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][unit]':'business_day',
     'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][value]':String(shipping.max),
     'shipping_address_collection[allowed_countries][0]':country,
-    'payment_method_types[0]':'card', client_reference_id:id
+    integration_identifier:'tsu-checkout-fzxqcrmt', client_reference_id:id
   });
+  if (mode === 'live') {
+    form.set('automatic_tax[enabled]','true');
+    form.set('shipping_options[0][shipping_rate_data][tax_behavior]','inclusive');
+  }
   items.forEach((item,index) => {
     const key = 'line_items['+index+']';
     form.set(key+'[price_data][currency]','eur');
     form.set(key+'[price_data][unit_amount]',String(item.price));
+    if (mode === 'live') form.set(key+'[price_data][tax_behavior]','inclusive');
     form.set(key+'[price_data][product_data][name]',item.name);
     form.set(key+'[quantity]',String(item.quantity));
   });
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions', {
-    method:'POST', headers:{ Authorization:'Bearer '+env.STRIPE_TEST_KEY, 'Content-Type':'application/x-www-form-urlencoded', 'Idempotency-Key':id }, body:form
-  },'Stripe');
-  if (session.livemode !== false || !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe de test invalide.',502);
+  const session = await stripeRequest(stripeKey,'/checkout/sessions',form,id);
+  if (session.livemode !== (mode === 'live') || !stripeSessionPattern.test(session.id ?? '') ||
+      !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe invalide.',502);
   await env.DB.prepare('INSERT INTO shop_orders (id, session_id, data) VALUES (?, ?, ?)')
-    .bind(id,session.id,JSON.stringify({ id,country,items,shippingFee:shipping.fee,payment:'unpaid',printful:'none' })).run();
-  return json({ url:session.url });
+    .bind(id,session.id,JSON.stringify({ id,mode,country,items,shippingFee:shipping.fee,payment:'unpaid',printful:'none' })).run();
+  return json({ url:session.url, sessionId:session.id });
 }
 
 async function syncOrder(env, id) {
-  if (!stripeEnabled(env) || !idPattern.test(id)) fail('Commande de test indisponible.');
+  if (typeof id !== 'string' || !idPattern.test(id)) fail('Commande indisponible.');
   const row = await env.DB.prepare('SELECT session_id, data FROM shop_orders WHERE id = ?').bind(id).first();
-  if (!row) fail('Commande introuvable.',404);
+  if (!row?.session_id) fail('Commande introuvable.',404);
+  return json(await reconcileOrder(env,row));
+}
+
+async function checkoutResult(request, env) {
+  const {sessionId} = await body(request,1024);
+  if (typeof sessionId !== 'string' || !stripeSessionPattern.test(sessionId)) fail('Session introuvable.',404);
+  const row = await env.DB.prepare('SELECT session_id, data FROM shop_orders WHERE session_id = ?').bind(sessionId).first();
+  if (!row) fail('Session introuvable.',404);
+  const saved = JSON.parse(row.data);
+  const order = saved.payment === 'paid' && saved.printfulId ? saved : await reconcileOrder(env,row);
+  return json({
+    reference:order.id, payment:order.payment, mode:order.mode ?? 'test',
+    total:order.items.reduce((sum,item)=>sum+item.price*item.quantity,0) + (order.shippingFee ?? 0)
+  });
+}
+
+async function patchOrder(env, id, changes, onlyWithoutDraft = false) {
+  const row = await env.DB.prepare(`UPDATE shop_orders SET data = json_patch(data, ?) WHERE id = ?${onlyWithoutDraft
+    ? " AND json_extract(data, '$.printfulId') IS NULL"
+    : ''} RETURNING data`).bind(JSON.stringify(changes),id).first();
+  if (row) return JSON.parse(row.data);
+  return JSON.parse((await env.DB.prepare('SELECT data FROM shop_orders WHERE id = ?').bind(id).first()).data);
+}
+
+async function reconcileOrder(env, row, eventType) {
   const order = JSON.parse(row.data);
-  const session = await provider('https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(row.session_id),{
-    headers:{Authorization:'Bearer '+env.STRIPE_TEST_KEY}
-  },'Stripe');
-  if (session.livemode !== false || session.client_reference_id !== id) fail('Session Stripe invalide.',502);
+  const {id} = order;
+  const live = order.mode === 'live';
+  const stripeKey = live ? liveStripeKey(env) : await activeStripeKey(env);
+  if (!stripeKey) fail('La connexion Stripe de cette commande est indisponible.',503);
+  const session = await stripeRequest(stripeKey,'/checkout/sessions/'+encodeURIComponent(row.session_id));
+  if (session.livemode !== live || session.client_reference_id !== id) fail('Session Stripe invalide.',502);
   const expected = order.items.reduce((sum,item)=>sum+item.price*item.quantity,0) + (order.shippingFee ?? 0);
   if (session.amount_total !== expected || session.currency !== 'eur') fail('Le total Stripe ne correspond pas à la commande.',502);
-  order.payment = session.payment_status === 'paid' ? 'paid' : session.status === 'expired' ? 'expired' : 'unpaid';
-  if (order.payment === 'paid' && await activePrintful(env)) {
+  if (session.payment_status !== 'paid') {
+    const payment = session.status === 'expired' ? 'expired'
+      : eventType === 'checkout.session.async_payment_failed' ? 'failed' : null;
+    if (!payment || order.payment === 'paid') return order;
+    const updated = await env.DB.prepare("UPDATE shop_orders SET data = json_set(data, '$.payment', ?) WHERE id = ? AND json_extract(data, '$.payment') <> 'paid' RETURNING data")
+      .bind(payment,id).first();
+    return updated ? JSON.parse(updated.data) : {...order,payment:'paid'};
+  }
+  if (live && session.automatic_tax?.status !== 'complete') fail('Stripe Tax n’a pas confirmé le calcul de cette commande.',502);
+  const paidOrder = order.payment === 'paid' ? order : await patchOrder(env,id,{payment:'paid'});
+  try {
+    if (!await activePrintful(env)) fail('Printful reste à connecter.',503);
     const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
     const address = shipping?.address;
     if (!address?.line1 || !address.postal_code || !address.city || address.country !== order.country || !shipping.name) fail('Adresse de livraison incomplète.');
-    try {
-      let draft;
-      const externalId = 'tsu-'+id;
-      try { draft = await printful(env,'/orders/@'+externalId); }
-      catch (error) {
-        if (error.providerStatus !== 404) throw error;
-        try {
-          draft = await printful(env,'/orders?confirm=false',{
-            external_id:externalId,
-            recipient:{ name:shipping.name,address1:address.line1,address2:address.line2 ?? '',
-              city:address.city,country_code:address.country,zip:address.postal_code },
-            items:order.items.map(item=>({ sync_variant_id:item.syncId,quantity:item.quantity }))
-          });
-        } catch (createError) {
-          if (![400,409].includes(createError.providerStatus)) throw createError;
-          draft = await printful(env,'/orders/@'+externalId);
-        }
-      }
-      order.printful = draft.status;
-      order.printfulId = draft.id;
-      order.error = '';
-      order.shipments = (draft.shipments ?? []).map(shipment=>({ number:shipment.tracking_number, url:shipment.tracking_url }));
-    } catch (error) {
-      order.error = error.status ? error.message : 'Impossible de joindre Printful.';
-    }
+    const draft = await orderDraft(env,paidOrder,shipping,address);
+    return patchOrder(env,id,{
+      printful:draft.status, printfulId:draft.id, error:'',
+      shipments:(draft.shipments ?? []).map(shipment=>({ number:shipment.tracking_number, url:shipment.tracking_url }))
+    });
+  } catch (error) {
+    if (paidOrder.printfulId) return {...paidOrder,error:'Impossible d’actualiser le statut Printful.'};
+    return patchOrder(env,id,{error:error.status ? error.message : 'Impossible de joindre Printful.'},true);
   }
-  await env.DB.prepare('UPDATE shop_orders SET data = ? WHERE id = ?').bind(JSON.stringify(order),id).run();
-  return json(order);
+}
+
+async function orderDraft(env, order, shipping, address) {
+  if (order.printfulId) return printful(env,'/orders/'+order.printfulId);
+  // Printful caps external IDs at 32 characters. A UUID without hyphens fits exactly.
+  const externalId = order.id.replaceAll('-','');
+  const lookupPath = '/orders/@'+externalId;
+  try { return await printful(env,lookupPath); }
+  catch (error) { if (error.providerStatus !== 404) throw error; }
+  try {
+    return await printful(env,'/orders?confirm=false',{
+      external_id:externalId,
+      recipient:{ name:shipping.name,address1:address.line1,address2:address.line2 ?? '',
+        city:address.city,country_code:address.country,zip:address.postal_code },
+      items:order.items.map(item=>({ sync_variant_id:item.syncId,quantity:item.quantity }))
+    });
+  } catch (createError) {
+    if (![400,409].includes(createError.providerStatus)) throw createError;
+    try { return await printful(env,lookupPath); }
+    catch (lookupError) { throw lookupError.providerStatus === 404 ? createError : lookupError; }
+  }
 }
 

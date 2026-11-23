@@ -4,7 +4,6 @@ const json = (data, status = 200) => Response.json(data, {
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const text = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const idPattern = /^[a-z0-9-]{1,40}$/;
-const stripeEnabled = env => /^(sk|rk)_test_/.test(env.STRIPE_TEST_KEY ?? '');
 const readData = async (db, sql, ...args) => {
   const result = await db.prepare(sql).bind(...args).all();
   return result.results.map(row => ({ ...JSON.parse(row.data), ...(row.created_at ? { createdAt: row.created_at } : {}) }));
@@ -83,24 +82,28 @@ const products = env => readData(env.DB,'SELECT data FROM products ORDER BY rowi
 async function handle(request, env) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
+  const tab = searchParams.get('tab');
+  const deepLink = ['products','settings','profile','printful','orders'].includes(tab) ? tab : '';
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
   const account = pathname === '/compte' || pathname.startsWith('/compte/') || pathname.startsWith('/api/account/');
+  if (method === 'POST' && pathname === '/api/stripe/webhook') return stripeWebhook(request,env,'test');
+  if (method === 'POST' && pathname === '/api/stripe/webhook/live') return stripeWebhook(request,env,'live');
   // The private Sites gate verifies the owner before the separate TSŪ login.
   if ((admin || account) && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
     return owner ? json({ error:'Accès réservé au propriétaire.' },403)
-      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname + (pathname === '/admin' && searchParams.get('tab') === 'printful' ? '?tab=printful' : '')),302)
+      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname + (pathname === '/admin' && deepLink ? '?tab='+deepLink : '')),302)
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
   if (pathname.startsWith('/api/account/')) return accountRoute(request,env,pathname.slice('/api/account/'.length),owner,email);
   if (admin && pathname !== '/admin/style.css' && !await ownerSession(request,env,owner)) {
-    return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(searchParams.get('tab') === 'printful' ? '?destination=printful' : ''),302)
+    return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(deepLink ? '?destination='+deepLink : ''),302)
       : json({error:'Connecte-toi à ton compte TSŪ.'},401);
   }
   if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);
-  if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin',302);
+  if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin'+(deepLink ? '?tab='+deepLink : ''),302);
   if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || storefrontRoute(pathname))) {
     return renderStorefront(request,env);
   }
@@ -115,15 +118,19 @@ async function handle(request, env) {
     const items = (await products(env)).filter(product=>product.published)
       .sort((a,b)=>Number(b.featured)-Number(a.featured))
       .map(product=>({ ...product, variants:product.variants.map(({syncId,...variant})=>variant) }));
-    return json({ items, settings, stripe:stripeEnabled(env) });
+    return json({ items, settings, stripe:await stripeEnabled(env) });
   }
-  if (method === 'POST' && pathname === '/api/checkout' && owner) return checkout(request,env,origin);
+  if (method === 'POST' && pathname === '/api/checkout/result' && (owner || salesEnabled(env))) return checkoutResult(request,env);
+  if (method === 'POST' && pathname === '/api/checkout' && (owner || salesEnabled(env))) return checkout(request,env,origin);
   if (method === 'POST' && pathname === '/api/admin/printful/import') return importPrintfulPage(env,(await body(request)).offset);
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
+  if (method === 'POST' && pathname === '/api/admin/stripe') return saveStripeConnection(request,env);
   if (method === 'POST' && pathname === '/api/admin/profile') return saveShopProfile(request,env);
   if (method === 'GET' && pathname === '/api/admin/state') {
     const connection = await readPrintfulConnection(env);
-    return json({ email, products:await products(env), settings:await storefront(env), profile:await shopProfile(env), stripe:stripeEnabled(env),
+    const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
+    return json({ email, products:await products(env), settings, profile, stripe:await stripeEnabled(env),
+      checkoutMode:await checkoutMode(env,settings,profile), liveRequested:salesEnabled(env),
       printful:Boolean(connection || env.PRINTFUL_TOKEN), printfulStore:connection?.store_name, orders:await readData(env.DB,'SELECT created_at, data FROM shop_orders ORDER BY created_at DESC LIMIT 100') });
   }
   if (method === 'POST' && pathname === '/api/admin/products') {

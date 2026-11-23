@@ -34,6 +34,7 @@
 <label>Règlement des litiges, si applicable <textarea name="disputeInfo" maxlength="1600"></textarea></label>
 </div></fieldset>
 <fieldset><legend>Livraison standard</legend>
+<p id="trial-shipping-note" hidden>Les tarifs préremplis sont provisoires et servent aux commandes de test.</p>
 <p>Le délai total inclut la fabrication et le transport. Utilise les frais que tu veux facturer par commande. Saisis 0 si tu offres les frais.</p>
 <div class="fields">
 <div><h3>Belgique</h3><label>Frais en euros <input name="BEFee" type="number" min="0" max="1000" step=".01"></label><label>Délai minimum en jours ouvrables <input name="BEMin" type="number" min="1" max="60"></label><label>Délai maximum en jours ouvrables <input name="BEMax" type="number" min="1" max="60"></label></div>
@@ -65,5 +66,24 @@
 </form>
 </details>
 </section>
-<section id="orders" hidden><h2>Commandes et tests</h2><p id="connections"></p><div class="heading"><button id="refresh-orders">Actualiser les commandes</button><a href="/#collection">Ouvrir le catalogue</a></div><div id="order-list"></div></section>
+<section id="orders" hidden>
+<h2>Commandes et tests</h2>
+<p id="connections"></p>
+<details id="stripe-settings">
+<summary id="stripe-settings-label">Connecter Stripe en mode test</summary>
+<form id="stripe-form">
+<ol>
+<li>Dans le sélecteur de compte Stripe, choisis <strong>Basculer vers un environnement de test</strong>, puis <strong>Environnement de test Tsu</strong>. Vérifie que le bandeau de test est affiché.</li>
+<li>Dans cet environnement, ouvre <strong>Clés API</strong>, puis <strong>Créer une clé restreinte</strong>. Autorise <strong>Écriture</strong> pour <strong>Checkout Sessions</strong>.</li>
+<li>Copie la nouvelle clé <code>rk_test_</code> et colle-la ici.</li>
+</ol>
+<p><a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer">Ouvrir Stripe et choisir l’environnement Tsu</a></p>
+<label>Clé Stripe restreinte de test <input name="key" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="510" aria-describedby="stripe-result" required></label>
+<button type="submit">Vérifier et connecter Stripe</button>
+<p id="stripe-result" role="status" aria-live="polite"></p>
+</form>
+</details>
+<p id="stripe-readiness" role="status"></p>
+<div class="heading"><button id="refresh-orders">Actualiser les commandes</button><a href="/#collection">Ouvrir le catalogue</a></div><div id="order-list"></div>
+</section>
 </main></body></html>

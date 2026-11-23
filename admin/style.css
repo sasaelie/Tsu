@@ -53,3 +53,6 @@ textarea { resize: vertical; }
   .variant label { flex-basis: 100%; }
   .product-actions { width: 100%; }
 }
+#stripe-settings summary{padding:.45rem 0;color:#2435a7;cursor:pointer;width:fit-content}
+#stripe-form button{margin-top:.85rem}
+#stripe-result:not(:empty){padding:.65rem;margin:.65rem 0 0}

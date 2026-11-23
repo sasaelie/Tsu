@@ -4,7 +4,9 @@
 
 - `worker/storefront.mjs` rend l’accueil, les collections, les fiches et les pages d’information en HTML côté serveur.
 - `worker/shop-profile.mjs` valide et enregistre les coordonnées publiques et les réglages de livraison.
-- `worker/checkout.mjs` crée les sessions Stripe en mode test et synchronise les commandes d’essai.
+- `worker/checkout.mjs` crée les sessions Stripe, vérifie les paiements et synchronise les commandes avec Printful.
+- `worker/stripe.mjs` vérifie et chiffre la clé Stripe du propriétaire.
+- `worker/stripe-webhook.mjs` vérifie la signature des notifications Stripe et les associe aux commandes TSŪ.
 - `worker/printful.mjs` gère la connexion Printful et l’import des produits en brouillon.
 - `worker/account.mjs` gère le compte propriétaire.
 - `dist/shop.js` et `dist/cart.js` gèrent le panier et le parcours d’achat dans le navigateur.
@@ -16,7 +18,17 @@ Sur l’hôte actuel, `node worker/build.mjs` assemble le Worker dans `dist/serv
 
 Le site est privé. L’indexation est désactivée par défaut. Le Worker fournit les URL canoniques, les variantes linguistiques, les métadonnées, le balisage Product et le plan du site. Le réglage serveur `TSU_INDEXABLE=true` est destiné au lancement public. Il ne change pas les permissions d’accès de l’hébergeur.
 
-L’achat direct et le panier utilisent le même récapitulatif. Pour tester Stripe, fournir `STRIPE_TEST_KEY` et renseigner les frais et le délai du pays dans l’administration. Aucun paiement réel n’est activé. Les frais configurés ici sont ceux facturés au client à titre de test. Ils ne constituent pas un devis Printful.
+L’achat direct et le panier utilisent le même récapitulatif. Pour tester Stripe, enregistrer une clé restreinte `rk_test_` depuis Commandes et tests et renseigner les frais et le délai du pays dans l’administration. La clé est chiffrée avec le secret serveur `TSU_STRIPE_ENCRYPTION_KEY`. Un réglage d’hébergement `STRIPE_TEST_KEY` est également accepté en l’absence de connexion administrateur. Les frais affichés pendant les tests sont provisoires.
+
+La page de retour vérifie la session Stripe et affiche la référence TSŪ, le statut et le total confirmé. Un paiement confirmé déclenche la création d’un brouillon Printful. L’administration permet de relancer cette étape en cas d’erreur. La fabrication se valide dans Printful.
+
+## Configuration du mode réel
+
+Une fois les tarifs de livraison et Stripe Tax validés, enregistrer la clé restreinte réelle `STRIPE_LIVE_KEY` et le secret de signature `STRIPE_LIVE_WEBHOOK_SECRET` dans les secrets de l’hébergeur. La destination Stripe réelle est `POST /api/stripe/webhook/live`. La destination de test `POST /api/stripe/webhook` utilise `STRIPE_TEST_WEBHOOK_SECRET`. L’hôte doit laisser Stripe atteindre chaque destination. Vérifier la livraison d’une notification depuis Stripe avant l’ouverture des ventes.
+
+Abonner la destination à `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` et `checkout.session.expired`. Les deux modes utilisent des secrets distincts. Les événements réessayés et la page de retour utilisent le même identifiant externe Printful.
+
+`TSU_CHECKOUT_MODE=live` sélectionne l’encaissement réel. Ce mode exige une connexion Printful, un secret de signature Stripe et des tarifs définitifs pour les pays actifs. Stripe Tax est demandé avec des prix taxes comprises en mode réel. Avant de l’activer, confirmer les immatriculations, les codes fiscaux et le résultat du calcul pour les pays livrés dans Stripe. Sur un domaine qui exige une connexion visiteur, le retour de paiement reste utilisable par un visiteur connecté. La livraison des notifications Stripe dépend de l’accès à la destination depuis l’extérieur.
 
 ## Points à finaliser avant la vente
 

@@ -138,7 +138,8 @@ function shippingContent(settings,profile,en) {
       (rule ? storefrontMoney(rule.fee,en) : local(en,'À confirmer','To be confirmed'))+'</td><td>'+
       (rule ? rule.min+'–'+rule.max+' '+local(en,'jours ouvrables','business days') : local(en,'À confirmer','To be confirmed'))+'</td></tr>';
   }).join('');
-  return '<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Les délais du tableau couvrent la fabrication et le transport.',
+  const preview = profile.shippingPreview ? '<p><strong>'+local(en,'Tarifs provisoires de test','Provisional test rates')+'</strong></p>' : '';
+  return preview+'<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Les délais du tableau couvrent la fabrication et le transport.',
     'Each item is made after you order. Printful typically estimates 2–5 business days for production, plus transit time. The times in the table cover production and transit.')+'</p>'+
     '<div class="table-wrap"><table><thead><tr><th scope="col">'+local(en,'Destination','Destination')+'</th><th scope="col">'+local(en,'Livraison standard','Standard shipping')+
     '</th><th scope="col">'+local(en,'Délai total estimé','Estimated total time')+'</th></tr></thead><tbody>'+rules+'</tbody></table></div>'+
@@ -180,9 +181,10 @@ function infoPage(key,settings,profile,en) {
 }
 
 async function renderStorefront(request,env) {
-  const {pathname, origin} = new URL(request.url);
-  const indexable = env.TSU_INDEXABLE === 'true';
-  const headers = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin'};
+  const {pathname, origin, searchParams} = new URL(request.url);
+  const checkoutReturn = searchParams.has('checkout_session');
+  const indexable = env.TSU_INDEXABLE === 'true' && !checkoutReturn;
+  const headers = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':checkoutReturn ? 'no-referrer' : 'strict-origin-when-cross-origin'};
   if (!indexable) headers['X-Robots-Tag'] = 'noindex, nofollow';
   if (pathname==='/robots.txt') {
     const rules = indexable ? 'User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n' :
@@ -244,7 +246,7 @@ async function renderStorefront(request,env) {
   else main = '<article class="shop-section info-page"><h1>'+htmlEscape(heading)+'</h1>'+
     (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+'</article>';
   const client = {
-    language:en?'en':'fr',stripe:stripeEnabled(env),countries:settings.countries,
+    language:en?'en':'fr',checkoutMode:await checkoutMode(env,settings,profile),liveRequested:salesEnabled(env),countries:settings.countries,
     shipping:profile.shipping ?? {},shippingPath:languagePath('/livraison-retours',en),
     products:published.map(({id,name,price,material,variants})=>({id,name,price,material,variants:variants.map(({id,size,color,label})=>({id,size,color,label}))}))
   };

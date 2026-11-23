@@ -70,19 +70,31 @@ function editProduct(product = {}) {
   form.elements.name.focus();
 }
 function renderOrders() {
+  get('stripe-settings-label').textContent = state.stripe ? 'Remplacer la clé de test Stripe' : 'Connecter Stripe en mode test';
+  if (!state.stripe) get('stripe-settings').open = true;
+  const ready = state.settings.countries.some(country=>state.profile?.shipping?.[country]);
+  get('stripe-readiness').textContent = state.liveRequested && state.checkoutMode !== 'live'
+    ? 'Vente bloquée. Vérifie les frais définitifs, la connexion Printful et les réglages Stripe réels.'
+    : !state.liveRequested && state.stripe && !ready
+    ? 'Renseigne les frais et les délais pour au moins un pays dans Coordonnées et livraison afin d’essayer le paiement.'
+    : '';
+  const stripeStatus = state.liveRequested ? (state.checkoutMode === 'live' ? 'Stripe en mode réel' : 'Stripe réel indisponible')
+    : (state.stripe ? 'Stripe en mode test connecté' : 'Stripe en mode test à connecter');
   get('connections').textContent =
-    (state.stripe ? 'Stripe en mode test connecté' : 'Stripe en mode test à connecter')+' · '+
+    stripeStatus+' · '+
     (state.printful ? 'Printful connecté' : 'Printful à connecter')+
     '. La synchronisation crée uniquement un brouillon Printful.';
   const list = get('order-list');
   list.replaceChildren();
-  if (!state.orders.length) list.append(element('p','Aucune commande de test pour le moment.'));
+  if (!state.orders.length) list.append(element('p','Aucune commande pour le moment.'));
   for (const order of state.orders) {
     const row = element('div',null,'record');
     const details = element('div');
-    const payments = { paid:'Payée en test', unpaid:'En attente de paiement', expired:'Session expirée' };
-    details.append(element('strong',payments[order.payment] ?? order.payment),element('p',
-      order.createdAt+' · '+order.country+' · Printful '+(order.printful === 'none' ? 'en attente' : order.printful)));
+    const payments = { paid:'Payée', unpaid:'En attente de paiement', expired:'Session expirée', failed:'Paiement échoué' };
+    const total = order.items.reduce((sum,item)=>sum+item.price*item.quantity,0) + (order.shippingFee ?? 0);
+    const printfulStatus = {none:'en attente',draft:'brouillon'};
+    details.append(element('strong',(payments[order.payment] ?? order.payment)+(order.mode === 'live' ? ' · Réel' : ' · Test')),element('p',
+      order.createdAt+' · '+order.country+' · '+euro(total)+' · Printful '+(printfulStatus[order.printful] ?? order.printful)));
     const lines = element('ul');
     order.items.forEach(item=>lines.append(element('li',item.quantity+' × '+item.name+' · '+euro(item.price*item.quantity))));
     details.append(lines);
@@ -190,6 +202,7 @@ const profileKeys = [
 ];
 function populateProfile() {
   const profile = state.profile ?? {};
+  get('trial-shipping-note').hidden = !profile.shippingPreview;
   for (const key of profileKeys) profileForm.elements[key].value = profile[key] ?? '';
   for (const country of ['BE','FR']) {
     const rule = profile.shipping?.[country];
@@ -272,7 +285,31 @@ async function syncCatalog() {
   }
 }
 get('sync-catalog').onclick = syncCatalog;
-tab(new URLSearchParams(location.search).get('tab') === 'printful' ? 'printful' : 'products');
+get('stripe-form').onsubmit = async event=>{
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = event.submitter;
+  const result = get('stripe-result');
+  button.disabled = true;
+  let saved = false;
+  feedback(result,'Vérification en cours…');
+  try {
+    await api('stripe',{key:form.elements.key.value});
+    form.reset();
+    feedback(result,'Stripe est connecté en mode test.','success');
+    saved = true;
+    await refresh();
+  } catch (error) {
+    form.elements.key.focus({preventScroll:true});
+    feedback(result,saved
+      ? 'Clé enregistrée. Actualise la page pour voir le statut.'
+      : error.message,saved ? 'success' : 'error');
+  } finally {
+    button.disabled = false;
+  }
+};
+const initialTab = new URLSearchParams(location.search).get('tab');
+tab(['products','settings','profile','printful','orders'].includes(initialTab) ? initialTab : 'products');
 run(null,async ()=>{
   await refresh();
   if (!get('products').hidden) await syncCatalog();

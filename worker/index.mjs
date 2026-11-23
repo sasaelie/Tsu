@@ -87,11 +87,12 @@ async function handle(request, env) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
   const tab = searchParams.get('tab');
-  const deepLink = ['products','settings','profile','printful','orders','customers'].includes(tab) ? tab : '';
+  const deepLink = ['products','settings','profile','printful','orders','customers','journal'].includes(tab) ? tab : '';
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
   const account = pathname === '/compte' || pathname.startsWith('/compte/') || pathname.startsWith('/api/account/');
+  if (method==='POST' && pathname==='/mcp') return journalMcp(request,env);
   if (method === 'POST' && pathname === '/api/stripe/webhook') return stripeWebhook(request,env,'test');
   if (method === 'POST' && pathname === '/api/stripe/webhook/live') return stripeWebhook(request,env,'live');
   if (pathname === '/newsletter/desinscription') return unsubscribeNewsletter(request,env);
@@ -138,6 +139,9 @@ async function handle(request, env) {
   if (method === 'POST' && pathname === '/api/admin/newsletter/send') return sendDesignAnnouncement(request,env);
   if (method === 'POST' && pathname === '/api/admin/tickets/reply') return replyToTicket(env,await body(request));
   if (method === 'POST' && pathname === '/api/admin/tickets/status') return setTicketStatus(request,env);
+  if (method === 'GET' && pathname === '/api/admin/journal') return json({editions:await listEditions(env)});
+  if (method === 'POST' && pathname === '/api/admin/journal/save') return json(await saveEdition(env,await body(request,26000)));
+  if (method === 'POST' && pathname === '/api/admin/journal/publish') return json(await publishEdition(env,(await body(request,1024)).week));
   if (method === 'POST' && pathname === '/api/admin/printful/import') return importPrintfulPage(env,(await body(request)).offset);
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
   if (method === 'POST' && pathname === '/api/admin/stripe') return saveStripeConnection(request,env);

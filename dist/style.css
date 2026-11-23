@@ -144,3 +144,21 @@
 .release-list li, .editorial-sources li { margin-block: .55rem; line-height: 1.5; }
 .article-meta { font-size: .94rem; }
 .editorial-signature { font-weight: 900; border-top: 2px solid var(--ink); padding-top: 1rem; margin-top: 2rem; }
+
+.tsu-promo {
+  position: fixed;
+  z-index: 5;
+  inset: auto 1rem 1rem auto;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: .85rem 1rem 1rem;
+  border: 3px solid var(--ink);
+  background: var(--yellow);
+  box-shadow: 4px 4px var(--ink);
+}
+.tsu-promo[hidden] { display: none; }
+.tsu-promo .tsu-promo-title { font-size: 1.55rem; font-weight: 950; margin: 0 2.1rem .4rem 0; }
+.tsu-promo p { margin: 0 0 .65rem; }
+.tsu-promo button { position: absolute; inset: .45rem .45rem auto auto; padding: .2rem .5rem; line-height: 1; }
+.tsu-promo a { font-weight: 850; text-decoration: underline; }
+.tsu-sponsor { margin: 1.25rem 0; border: 2px solid var(--ink); padding: .75rem 1rem; background: #fff; }
+.tsu-sponsor p { margin: 0 0 .25rem; font-size: .9rem; }

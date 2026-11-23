@@ -1,7 +1,7 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/index.js"></script></head>
 <body><header><a href="/">TSŪ <span>Boutique</span></a><a href="/compte"><span>Mon compte</span></a></header>
 <main><h1>Gérer TSŪ</h1><p id="identity"></p><p id="notice" role="status" aria-live="polite"></p>
-<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button><button data-tab="customers">Clients et newsletter</button></nav>
+<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button><button data-tab="customers">Clients et newsletter</button><button data-tab="journal">Journal</button></nav>
 <section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
 <label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="acc">Accessoire</option></select></label>
@@ -101,5 +101,20 @@
 <p id="announcement-status" role="status"></p>
 </form>
 <h3>Tickets clients</h3><div id="support-list"></div>
+</section>
+<section id="journal" hidden>
+<h2>Journal</h2>
+<div class="heading"><button id="journal-new" type="button">Nouvelle édition</button><button id="journal-refresh" type="button">Actualiser</button><a href="/blog">Voir le journal</a></div>
+<div id="journal-editions"></div>
+<form id="journal-form" hidden>
+<div class="fields">
+<label>Lundi de référence <input name="week" type="date" required></label>
+<label>Introduction française <textarea name="introFr" maxlength="1000"></textarea></label>
+<label>Introduction anglaise <textarea name="introEn" maxlength="1000"></textarea></label>
+</div><div id="journal-items"></div>
+<button id="journal-add-item" type="button">Ajouter une sortie</button>
+<button type="submit" value="draft">Enregistrer le brouillon</button>
+<button type="submit" value="publish">Publier l’édition</button>
+</form>
 </section>
 </main></body></html>

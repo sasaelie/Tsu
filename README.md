@@ -4,6 +4,7 @@
 
 - `worker/storefront.mjs` rend l’accueil, les collections, les fiches et les pages d’information en HTML côté serveur.
 - `worker/editorial.mjs` contient l’histoire de la marque, la FAQ bilingue, le journal et les dates de parution vérifiées.
+- `worker/journal-editions.mjs` gère les brouillons hebdomadaires, la publication et l’archivage.
 - `worker/shop-profile.mjs` valide et enregistre les coordonnées publiques et les réglages de livraison.
 - `worker/checkout.mjs` crée les sessions Stripe, vérifie les paiements et synchronise les commandes avec Printful.
 - `worker/stripe.mjs` vérifie et chiffre la clé Stripe du propriétaire.
@@ -16,6 +17,12 @@
 - `drizzle/` contient les migrations SQL.
 
 Sur l’hôte actuel, `node worker/build.mjs` assemble le Worker dans `dist/server/index.js`. Le manifeste d’hébergement est conservé dans le dépôt de déploiement Sites. Les secrets Stripe et Printful sont configurés sur le serveur.
+
+## Veille et annonces
+
+Dans **Administration → Journal**, relire et publier une édition après vérification. Une édition publiée garde son lien dans les archives. L’outil du site `save_journal_watch_draft` accepte un seul nouveau brouillon par lundi de référence et demande l’identité du propriétaire. Si une édition existe déjà, le résultat de la tâche indique sa semaine. Le compte propriétaire reste nécessaire pour publier.
+
+L’accueil présente une promotion du Journal au maximum une fois par semaine sur un navigateur. L’emplacement sponsor du Journal s’affiche lorsque `TSU_SPONSOR_NAME` et une adresse HTTPS `TSU_SPONSOR_URL` sont configurés. Une régie publicitaire peut être intégrée ultérieurement dans l’emplacement du Journal.
 
 ## Préproduction
 

@@ -393,9 +393,75 @@ get('announcement-form').onsubmit=event=>{
 get('refresh-customers').onclick=event=>run(event.currentTarget,showSupport);
 document.querySelector('[data-tab="customers"]').addEventListener('click',()=>run(null,showSupport));
 const initialTab = new URLSearchParams(location.search).get('tab');
-tab(['products','settings','profile','printful','orders','customers'].includes(initialTab) ? initialTab : 'products');
+tab(['products','settings','profile','printful','orders','customers','journal'].includes(initialTab) ? initialTab : 'products');
 run(null,async ()=>{
   await refresh();
   if (!get('products').hidden) await syncCatalog();
   if (!get('customers').hidden) await showSupport();
+  if (!get('journal').hidden) await refreshJournal();
 });
+
+const journalForm=get('journal-form');
+const journalRows=get('journal-items');
+function addJournalItem(data={}) {
+  if(journalRows.children.length>=10) return;
+  const row=element('fieldset');
+  row.append(element('legend','Sortie'));
+  for(const [name,label,type] of [
+    ['kind','Type','select'],['title','Titre','text'],['date','Date','date'],['source','Lien de la source','url'],
+    ['noteFr','Note française','textarea'],['noteEn','Note anglaise','textarea']
+  ]){
+    const field=element(type==='textarea'||type==='select'?type:'input');
+    if(type!=='textarea'&&type!=='select') field.type=type;
+    if(type==='select') field.append(new Option('Manga','manga'),new Option('Anime','anime'));
+    field.name=name;
+    field.required=!name.startsWith('note');
+    field.value=data[name]??(name==='kind'?'manga':'');
+    if(type==='textarea') field.maxLength=550;
+    const wrapper=element('label',label);
+    wrapper.append(field);
+    row.append(wrapper);
+  }
+  row.append(button('Retirer cette sortie',()=>row.remove()));
+  journalRows.append(row);
+}
+function editJournal(edition={}) {
+  journalForm.reset();
+  for(const key of ['week','introFr','introEn']) journalForm.elements[key].value=edition[key]??'';
+  journalRows.replaceChildren();
+  for(const row of edition.items??[]) addJournalItem(row);
+  journalForm.hidden=false;
+  journalForm.elements.week.focus();
+}
+async function refreshJournal(){
+  const {editions}=await api('journal');
+  const list=get('journal-editions');
+  list.replaceChildren();
+  if(!editions.length) list.append(element('p','Aucune édition hebdomadaire pour le moment.'));
+  for(const edition of editions){
+    const entry=element('p',edition.week+' · '+(edition.publishedAt?'Publiée':'Brouillon')+' · '+edition.items.length+' sortie(s) ');
+    if(edition.publishedAt){
+      const link=element('a','Lire');
+      link.href='/blog/veille-'+edition.week;
+      entry.append(link);
+    } else entry.append(button('Relire et modifier',()=>editJournal(edition)));
+    list.append(entry);
+  }
+}
+get('journal-new').onclick=()=>editJournal();
+get('journal-refresh').onclick=e=>run(e.currentTarget,refreshJournal);
+get('journal-add-item').onclick=()=>addJournalItem();
+document.querySelector('[data-tab="journal"]').addEventListener('click',()=>run(null,refreshJournal));
+journalForm.onsubmit=e=>{
+  e.preventDefault();
+  const publish=e.submitter.value==='publish';
+  const data=Object.fromEntries(['week','introFr','introEn'].map(key=>[key,journalForm.elements[key].value]));
+  data.items=Array.from(journalRows.children,row=>Object.fromEntries(Array.from(row.querySelectorAll('[name]'),field=>[field.name,field.value])));
+  return run(e.submitter,async()=>{
+    await api('journal/save',data);
+    if(publish) await api('journal/publish',{week:data.week});
+    journalForm.hidden=true;
+    await refreshJournal();
+    notice(publish?'Édition publiée dans le journal.':'Brouillon enregistré.','success');
+  });
+};

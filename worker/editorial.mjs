@@ -7,7 +7,9 @@ const editorialPages = {
     descEn:'Printful production, shipping to Belgium and France, tracking, sizing, faults and returns at TSŪ.'},
   '/blog':{enPath:'/en/blog',page:'blog',fr:'Le journal TSŪ',en:'The TSŪ journal',
     descFr:'Style otaku, streetwear manga, conventions et recommandations de lecture sans spoilers.',
-    descEn:'Otaku style, manga streetwear, conventions and spoiler-free reading recommendations.'}
+    descEn:'Otaku style, manga streetwear, conventions and spoiler-free reading recommendations.'},
+  '/blog/archives':{enPath:'/en/blog/archive',page:'archive',fr:'Archives du journal',en:'Journal archive',
+    descFr:'Toutes les éditions manga et anime du journal TSŪ.',descEn:'All manga and anime editions from the TSŪ journal.'}
 };
 
 const editorialLinks = {
@@ -133,6 +135,11 @@ function editorialRoute(pathname) {
   const match = /^(\/blog|\/en\/blog)\/([a-z0-9-]+)$/.exec(pathname);
   if (!match) return null;
   const en = match[1]==='/en/blog';
+  const weekly = /^(veille|watch)-(\d{4}-\d{2}-\d{2})$/.exec(match[2]);
+  if (weekly && weekly[1]===(en?'watch':'veille') && editionDate(weekly[2])) {
+    const week=weekly[2];
+    return {path:editionPath(week),enPath:editionEnglishPath(week),page:'edition',en,week,title:editionTitle(week,en)};
+  }
   const article = journal.find(item=>(en?item.enSlug:item.slug)===match[2]);
   return article
     ? {...article,article,path:'/blog/'+article.slug,enPath:'/en/blog/'+article.enSlug,page:'article',en,title:en?article.en:article.fr}
@@ -141,6 +148,7 @@ function editorialRoute(pathname) {
 
 function editorialEnglishPath(path) {
   if (editorialPages[path]) return editorialPages[path].enPath;
+  if (/^\/blog\/veille-\d{4}-\d{2}-\d{2}$/.test(path)) return editionEnglishPath(path.slice(-10));
   const item = journal.find(article=>path==='/blog/'+article.slug);
   return item ? '/en/blog/'+item.enSlug : '';
 }
@@ -207,13 +215,16 @@ function faqEditorial(en) {
 function mangaDate(value,en) {
   return new Intl.DateTimeFormat(en?'en-IE':'fr-BE',{day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(value));
 }
-function journalEditorial(en) {
+function journalEditorial(en,editions) {
   const featured = journal.find(item=>item.selection);
   const cards = [featured,...journal.filter(item=>item!==featured)].map(item=>
     '<li><h2>'+navLink('/blog/'+item.slug,en,item.fr,item.en)+'</h2><p>'+htmlEscape(local(en,item.descFr,item.descEn))+'</p></li>'
   ).join('');
   const schedule = [...upcomingManga,...mangaSelection].sort((a,b)=>b.release.localeCompare(a.release));
   return '<p class="editorial-lead">'+local(en,'Du vestiaire à la bibliothèque. Des idées de tenues, des guides et des lectures sans spoilers.','From wardrobe to bookshelf. Outfit ideas, guides and spoiler-free reading picks.')+'</p>'+
+    '<section><h2>'+local(en,'La veille manga et anime','Manga and anime watch')+'</h2>'+
+    (editions.length?editionList(editions.slice(0,3),en):'<p>'+local(en,'Retrouve les sorties vérifiées dans le calendrier ci-dessous.','Find verified releases in the calendar below.')+'</p>')+
+    '<p>'+navLink('/blog/archives',en,'Toutes les éditions','All editions')+'</p></section>'+
     '<ul class="journal-grid">'+cards+'</ul><section id="sorties-manga"><h2>'+local(en,'Sorties manga à suivre','Manga releases to follow')+'</h2><p>'+
     local(en,'Repères vérifiés le 23 novembre 2026 pour les éditions francophones. Une date de parution peut bouger et la disponibilité en librairie en Belgique varie.',
       'Checked 23 November 2026 for French-language editions. Release dates can change and bookseller availability in Belgium varies.')+'</p><ul class="release-list">'+
@@ -239,4 +250,20 @@ function articleEditorial(article,en) {
   return '<p class="article-meta">'+navLink('/blog',en,'Le journal TSŪ','The TSŪ journal')+' · <time datetime="2026-11-23">'+
     local(en,'23 novembre 2026','23 November 2026')+'</time></p><p class="editorial-lead">'+htmlEscape(intro)+'</p>'+body+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';
+}
+
+function editorialPromo(en) {
+  return '<aside id="tsu-promo" class="tsu-promo" hidden aria-labelledby="tsu-promo-title">'+
+    '<p id="tsu-promo-title" class="tsu-promo-title">'+local(en,'Pause manga !','Manga break!')+'</p>'+
+    '<button type="button" aria-label="'+local(en,'Fermer la fenêtre promotionnelle','Close promotion')+'">×</button>'+
+    '<p>'+local(en,'Retrouve les sorties manga et anime dans le journal TSŪ.','Find the latest manga and anime in the TSŪ journal.')+'</p>'+
+    '<a href="'+languagePath('/blog',en)+'">'+local(en,'Lire le journal','Read the journal')+'</a></aside>';
+}
+
+function editorialSponsor(env,en) {
+  const url=safePhoto(env.TSU_SPONSOR_URL);
+  const name=text(env.TSU_SPONSOR_NAME,110);
+  if (!url || !name) return '';
+  return '<aside class="tsu-sponsor"><p>'+local(en,'Annonce sponsorisée','Sponsored announcement')+'</p>'+
+    '<a href="'+htmlEscape(url)+'" rel="sponsored noopener noreferrer">'+htmlEscape(name)+'</a></aside>';
 }

@@ -233,3 +233,22 @@ if (receiptSession) {
   const message=element('p',t('Retour de Stripe en mode test. Le statut du paiement se vérifie dans l’administration.','Returned from Stripe test mode. Check payment status in the administration panel.'),{class:'test-return',role:'status'});
   get('main').prepend(message);
 }
+
+// Keep the promotion out of checkout and show it at most once per week.
+const promo = get('tsu-promo');
+if (promo) {
+  const promoKey='tsu-journal-promo';
+  const interval=7*24*60*60*1000;
+  promo.querySelector('button').onclick=()=>{promo.hidden=true;};
+  document.addEventListener('keydown',event=>{if (event.key==='Escape' && !promo.hidden) promo.hidden=true;});
+  get('basket').addEventListener('click',()=>{promo.hidden=true;});
+  new MutationObserver(()=>{if(modal.open) promo.hidden=true;}).observe(modal,{attributes:true,attributeFilter:['open']});
+  setTimeout(()=>{
+    if(modal.open || document.visibilityState!=='visible') return;
+    try {
+      if(Date.now()-Number(localStorage.getItem(promoKey))<interval) return;
+      localStorage.setItem(promoKey,String(Date.now()));
+      promo.hidden=false;
+    } catch {}
+  },9000);
+}

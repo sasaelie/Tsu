@@ -3,6 +3,7 @@
 ## Organisation du code
 
 - `worker/storefront.mjs` rend l’accueil, les collections, les fiches et les pages d’information en HTML côté serveur.
+- `worker/editorial.mjs` contient l’histoire de la marque, la FAQ bilingue, le journal et les dates de parution vérifiées.
 - `worker/shop-profile.mjs` valide et enregistre les coordonnées publiques et les réglages de livraison.
 - `worker/checkout.mjs` crée les sessions Stripe, vérifie les paiements et synchronise les commandes avec Printful.
 - `worker/stripe.mjs` vérifie et chiffre la clé Stripe du propriétaire.

@@ -14,7 +14,8 @@ const jsonScript = value=>JSON.stringify(value).replace(/</g,'\\u003c');
 const storefrontMoney = (amount, en)=>new Intl.NumberFormat(en?'en-IE':'fr-BE',{style:'currency',currency:'EUR'}).format(amount/100);
 const local = (en, fr, english)=>en ? english : fr;
 const languagePath = (path, en)=>en
-  ? (path.startsWith('/produits/') ? path.replace('/produits/','/en/products/') : Object.keys(englishPaths).find(key=>englishPaths[key]===path) ?? '/en')
+  ? (path.startsWith('/produits/') ? path.replace('/produits/','/en/products/') :
+    editorialEnglishPath(path) || Object.keys(englishPaths).find(key=>englishPaths[key]===path) || '/en')
   : path;
 const productPath = product=>{
   const slug = product.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -24,6 +25,8 @@ const productPath = product=>{
 const typeName = (type,en)=>type==='tee' ? 'T-shirts' : local(en,'Accessoires','Accessories');
 const collectionPath = type=>type==='tee' ? '/collections/t-shirts' : '/collections/accessoires';
 function storefrontRoute(path) {
+  const editorial = editorialRoute(path);
+  if (editorial) return editorial;
   if (Object.hasOwn(storefrontPaths,path)) return {path,en:false};
   if (Object.hasOwn(englishPaths,path)) return {path:englishPaths[path],en:true};
   const match = /^(\/en\/products|\/produits)\/([a-z0-9-]{1,40})(?:\/([a-z0-9-]+))?$/.exec(path);
@@ -57,7 +60,8 @@ function navLink(path,en,fr,english) {
 function storefrontHeader(path,settings,en) {
   return '<div class="bar">'+local(en,'Impression à la demande','Print on demand')+' · '+htmlEscape(countriesLabel(settings,en))+'</div>'+
     '<header class="site-header"><a class="brand" href="'+languagePath('/',en)+'" aria-label="TSŪ">TSŪ<span aria-hidden="true">✷</span></a>'+
-    '<nav aria-label="'+local(en,'Collections','Collections')+'">'+navLink('/collections/t-shirts',en,'T-shirts','T-shirts')+navLink('/collections/accessoires',en,'Accessoires','Accessories')+'</nav>'+
+    '<nav aria-label="'+local(en,'Navigation principale','Main navigation')+'">'+navLink('/collections/t-shirts',en,'T-shirts','T-shirts')+
+    navLink('/collections/accessoires',en,'Accessoires','Accessories')+navLink('/blog',en,'Journal','Journal')+'</nav>'+
     '<div class="actions"><a class="account-link" href="'+local(en,'/espace-client','/en/account')+'">'+local(en,'Mon compte','My account')+'</a>'+
     '<a class="language-link" hreflang="'+local(en,'en','fr')+'" href="'+languagePath(path,!en)+'" aria-label="'+local(en,'English','Français')+'">'+local(en,'EN','FR')+'</a>'+
     '<button id="basket" type="button">'+local(en,'Panier','Cart')+' <b id="count">0</b></button></div></header>';
@@ -77,6 +81,7 @@ function storefrontFooter(profile,en) {
     navLink('/contact',en,'Contact','Contact')+navLink('/mentions-legales',en,'Mentions légales','Legal notice')+
     navLink('/livraison-retours',en,'Livraison et retours','Shipping and returns')+
     navLink('/conditions-de-vente',en,'Conditions de vente','Terms of sale')+navLink('/confidentialite',en,'Confidentialité','Privacy')+
+    navLink('/a-propos',en,'À propos de TSŪ','About TSŪ')+navLink('/faq',en,'FAQ','FAQ')+
     '<a href="'+local(en,'/espace-client','/en/account')+'#newsletter">Newsletter</a>'+
     '</nav></footer>';
 }
@@ -108,6 +113,7 @@ function homeContent(items,settings,en,member) {
     '<section class="shop-section about-shop"><h2>'+local(en,'L’univers TSŪ','The world of TSŪ')+'</h2><p>'+
     local(en,'TSŪ réunit des pièces de tous les jours inspirées des mangas et du folklore japonais. Les articles sont imprimés ou brodés à la demande. La fabrication commence après la commande, puis le colis est expédié.',
       'TSŪ brings together everyday pieces inspired by manga and Japanese folklore. Items are printed or embroidered on demand. Production begins after an order is placed, then the parcel is shipped.')+'</p><p>'+
+    navLink('/a-propos',en,'Découvrir l’histoire de TSŪ','Discover the TSŪ story')+' · '+
     navLink('/livraison-retours',en,'Voir les délais, les frais et les retours','See delivery times, prices and returns')+'</p></section>';
 }
 function productContent(product,settings,en) {
@@ -201,7 +207,7 @@ async function renderStorefront(request,env) {
   const all = await products(env);
   const publiclyAvailable = all.filter(product=>canViewProduct(product,false));
   if (pathname==='/sitemap.xml') {
-    const pages = ['/', '/collections/t-shirts','/collections/accessoires',...publiclyAvailable.map(productPath)];
+    const pages = [...Object.keys(storefrontPaths),...Object.keys(editorialPages),...journal.map(item=>'/blog/'+item.slug),...publiclyAvailable.map(productPath)];
     const urls = pages.flatMap(path=>[path,languagePath(path,true)]).map(path=>'<url><loc>'+htmlEscape(origin+path)+'</loc></url>').join('');
     return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls+'</urlset>',{
       headers:{...headers,'Content-Type':'application/xml; charset=utf-8'}
@@ -215,7 +221,7 @@ async function renderStorefront(request,env) {
   const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
   const product = route.id ? published.find(item=>item.id===route.id) : null;
   if (product && !canViewProduct(product,false)) headers['X-Robots-Tag'] = 'noindex, nofollow';
-  const page = route.id ? (product ? 'product' : 'missing') : storefrontPaths[route.path];
+  const page = route.id ? (product ? 'product' : 'missing') : route.page ?? storefrontPaths[route.path];
   const path = product ? productPath(product) : route.id ? '/' : route.path;
   if (product && pathname !== languagePath(path,en)) return Response.redirect(origin+languagePath(path,en),301);
   const titles = {
@@ -224,7 +230,7 @@ async function renderStorefront(request,env) {
     terms:local(en,'Conditions de vente','Terms of sale'),privacy:local(en,'Confidentialité','Privacy'),
     product:product?.name,missing:local(en,'Produit introuvable','Product not found')
   };
-  const heading = titles[page];
+  const heading = route.title || titles[page];
   const canonical = origin+languagePath(path,en);
   const defaults = {
     home:local(en,'TSŪ, le vestiaire otaku. T-shirts et accessoires inspirés du manga, fabriqués à la demande.','TSŪ, the otaku wardrobe. Manga-inspired T-shirts and accessories, made to order.'),
@@ -232,7 +238,7 @@ async function renderStorefront(request,env) {
     acc:local(en,'Découvre les accessoires manga de TSŪ, des casquettes et bobs aux autres pièces de la collection.','Browse TSŪ manga accessories, including caps, bucket hats and other pieces.'),
     product:product ? product.name+' · '+typeName(product.type,en)+' · '+local(en,'Fabrication à la demande. Consulte les variantes, le prix et la livraison sur TSŪ.','Made to order. See options, pricing and delivery at TSŪ.') : ''
   };
-  const description = text(product?.[en?'en':'fr'] || product?.[en?'fr':'en'] || defaults[page] ||
+  const description = text(local(en,route.descFr,route.descEn) || product?.[en?'en':'fr'] || product?.[en?'fr':'en'] || defaults[page] ||
     heading+' · '+local(en,'Informations de la boutique TSŪ.','TSŪ store information.'),155);
   const schema = product ? {
     '@context':'https://schema.org','@type':'Product',name:product.name,
@@ -240,7 +246,9 @@ async function renderStorefront(request,env) {
     ...(product[en?'en':'fr'] || product[en?'fr':'en'] ? {description} : {}),
     ...(product.material ? {material:product.material} : {}),
     category:typeName(product.type,en),sku:product.id,url:canonical
-  } : page==='home' ? {'@context':'https://schema.org','@type':'WebSite',name:'TSŪ',url:canonical,inLanguage:en?'en':'fr'} : null;
+  } : page==='article' ? {'@context':'https://schema.org','@type':'BlogPosting',headline:heading,description,url:canonical,
+    datePublished:'2026-11-23',inLanguage:en?'en':'fr',author:{'@type':'Organization',name:'TSŪ',url:origin+languagePath('/a-propos',en)}} :
+    page==='home' ? {'@context':'https://schema.org','@type':'WebSite',name:'TSŪ',url:canonical,inLanguage:en?'en':'fr'} : null;
   const title = heading+' | TSŪ';
   const meta = '<title>'+htmlEscape(title)+'</title><meta name="description" content="'+htmlEscape(description)+'">'+
     ((!indexable || page==='missing') ? '<meta name="robots" content="noindex, nofollow">' : '')+
@@ -251,6 +259,12 @@ async function renderStorefront(request,env) {
   let main;
   if (page==='home') main = homeContent(published,settings,en,member);
   else if (page==='product') main = productContent(product,settings,en);
+  else if (['about','faq','blog','article'].includes(page)) {
+    const content = page==='about' ? aboutEditorial(en) : page==='faq' ? faqEditorial(en) :
+      page==='blog' ? journalEditorial(en) : articleEditorial(route.article,en);
+    main = '<'+(page==='blog'?'section':'article')+' class="shop-section info-page editorial"><h1>'+htmlEscape(heading)+'</h1>'+
+      content+'</'+(page==='blog'?'section':'article')+'>';
+  }
   else if (page==='tee' || page==='acc') main = '<section class="shop-section"><h1>'+heading+'</h1><p>'+
     (page==='tee' ? local(en,'Des T-shirts inspirés du manga, en coupe classique ou oversize selon le modèle.','Manga-inspired T-shirts in classic or oversized fits, depending on the design.') :
       local(en,'Casquettes, bobs et accessoires inspirés de la culture otaku.','Caps, bucket hats and accessories inspired by otaku culture.'))+'</p>'+

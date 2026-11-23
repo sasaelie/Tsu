@@ -10,3 +10,46 @@
 .password-field input{min-width:0;flex:1;border:1px solid #71677c;padding:.5rem;font:inherit}
 .password-field button{display:grid;place-items:center;min-width:44px;padding:.35rem}
 .product-summary{min-width:0;flex:1}.product-summary img{float:left;width:64px;height:64px;object-fit:contain;margin:0 .75rem .15rem 0}.product-actions{display:flex;flex-wrap:wrap;gap:.5rem}.product-actions button:last-child:not(:first-child){background:#ffe440}
+
+/* Form controls and catalogue actions must fit narrow screens. */
+main,
+section,
+form,
+fieldset,
+.fields > *,
+.product-summary,
+.product-actions {
+  min-width: 0;
+}
+
+main {
+  overflow-wrap: anywhere;
+}
+
+textarea { resize: vertical; }
+
+@media (max-width: 650px) {
+  header { flex-wrap: wrap; }
+  section, section form { padding: clamp(.65rem, 3vw, 1rem); }
+  nav[aria-label="Administration"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  nav[aria-label="Administration"] button,
+  section button,
+  form input:not([type="checkbox"]),
+  form select,
+  #printful-credentials summary {
+    min-height: 44px;
+  }
+  nav[aria-label="Administration"] button { padding-inline: .45rem; }
+  .product-summary { flex-basis: min(100%, 16rem); }
+  .password-field input { width: 100%; }
+  .product-actions button { padding-inline: .6rem; }
+}
+
+@media (max-width: 380px) {
+  .heading { align-items: flex-start; }
+  .variant label { flex-basis: 100%; }
+  .product-actions { width: 100%; }
+}

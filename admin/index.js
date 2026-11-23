@@ -62,12 +62,30 @@ function editProduct(product = {}) {
   for (const key of ['id','name','image','fr','en','material','care','sizing','safety']) form.elements[key].value = product[key] ?? '';
   form.elements.type.value = product.type ?? 'tee';
   form.elements.price.value = product.price ? (product.price/100).toFixed(2) : '';
+  form.elements.audience.value = product.audience ?? 'public';
+  form.elements.releaseAt.value = product.releaseAt ? brusselsInput(new Date(product.releaseAt)) : '';
+  productAudience();
   for (const key of ['published','featured']) form.elements[key].checked = Boolean(product[key]);
   get('variants').replaceChildren();
   const variants = product.variants?.length ? product.variants : [{}];
   variants.forEach(variantRow);
   form.hidden = false;
   form.elements.name.focus();
+}
+const brussels = new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Brussels',dateStyle:'short',timeStyle:'short'});
+const brusselsInput = value => brussels.format(value).replace(' ','T');
+function utcRelease(value) {
+  const minute = Date.parse(value+'Z');
+  for (const offset of [1,2]) {
+    const date = new Date(minute-offset*3600000);
+    if (Number.isFinite(date.getTime()) && brusselsInput(date)===value) return date.toISOString();
+  }
+  throw new Error('Cette heure de sortie n’existe pas à Bruxelles. Choisis une autre heure.');
+}
+function productAudience() {
+  const early = form.elements.audience.value==='early';
+  get('release-field').hidden=!early;
+  form.elements.releaseAt.required=early;
 }
 function renderOrders() {
   get('stripe-settings-label').textContent = state.stripe ? 'Remplacer la clé de test Stripe' : 'Connecter Stripe en mode test';
@@ -177,6 +195,7 @@ function tab(id) {
   if (id === 'products') syncCatalog();
 }
 document.querySelectorAll('[data-tab]').forEach(control=>{control.onclick=()=>tab(control.dataset.tab);});
+form.elements.audience.onchange=productAudience;
 get('new').onclick = ()=>editProduct();
 get('add-variant').onclick = ()=>variantRow();
 get('refresh-orders').onclick = event=>run(event.currentTarget,refresh);
@@ -190,6 +209,7 @@ form.onsubmit = event=>{
     id:row.dataset.id,label:row.dataset.label,...Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.key,input.value]))
   }));
   return run(event.submitter,async ()=>{
+    if (data.audience==='early') data.releaseAt=utcRelease(data.releaseAt);
     await api('products',data);
     form.hidden = true;
     await refresh();
@@ -308,9 +328,74 @@ get('stripe-form').onsubmit = async event=>{
     button.disabled = false;
   }
 };
+async function showSupport(openTicket) {
+  const data = await api('customers');
+  get('newsletter-summary').textContent = data.count+' inscription(s) confirmée(s).'+
+    (data.emailReady ? '' : ' L’expéditeur e-mail reste à configurer.');
+  const announcement = get('announcement-form');
+  const eligible = (state?.products ?? []).filter(product=>product.published && ['early','newsletter'].includes(product.audience));
+  const select = announcement.elements.productId;
+  const previous = select.value;
+  select.replaceChildren(...eligible.map(product=>new Option(product.name,product.id)));
+  if (eligible.some(product=>product.id===previous)) select.value=previous;
+  announcement.hidden = !data.emailReady || !data.count || !eligible.length;
+  const list = get('support-list');
+  list.replaceChildren();
+  if (!data.tickets.length) list.append(element('p','Aucun ticket client.'));
+  for (const ticket of data.tickets) {
+    const entry = element('details',null,'record');
+    entry.open=ticket.id===openTicket;
+    entry.append(element('summary',ticket.subject+' · '+(ticket.status==='open'?'Ouvert':'Fermé')),element('p',ticket.email));
+    if (ticket.order_id) entry.append(element('p','Commande '+ticket.order_id));
+    for (const message of ticket.messages) {
+      const line=element('p',message.message);
+      line.style.whiteSpace='pre-wrap';
+      entry.append(element('strong',message.sender==='shop'?'TSŪ':'Client'),line);
+    }
+    if (ticket.status==='open') {
+      const reply=element('form');
+      const label=element('label','Réponse');
+      const field=element('textarea'); field.required=true; field.maxLength=4000;
+      label.append(field);
+      const submit=element('button','Envoyer la réponse');
+      reply.append(label,submit);
+      reply.onsubmit=event=>{
+        event.preventDefault();
+        run(submit,async()=>{await api('tickets/reply',{id:ticket.id,message:field.value}); await showSupport(ticket.id); notice('Réponse envoyée.','success');});
+      };
+      entry.append(reply);
+    }
+    entry.append(button(ticket.status==='open'?'Fermer le ticket':'Rouvrir le ticket',control=>run(control,async()=>{
+      await api('tickets/status',{id:ticket.id,status:ticket.status==='open'?'closed':'open'});
+      await showSupport(ticket.id);
+      notice('Ticket mis à jour.','success');
+    })));
+    list.append(entry);
+  }
+}
+get('announcement-form').onsubmit=event=>{
+  event.preventDefault();
+  const productId=event.currentTarget.elements.productId.value;
+  if (!productId || !window.confirm('Envoyer l’annonce aux abonnés confirmés de TSŪ ?')) return;
+  run(event.submitter,async()=>{
+    const status=get('announcement-status');
+    let sent=0;
+    let result;
+    do {
+      result=await api('newsletter/send',{productId});
+      sent+=result.sent;
+      status.textContent=sent+' annonce(s) acceptée(s) par le service e-mail.';
+    } while (result.remaining && result.sent && !result.failed);
+    if (result.failed) status.textContent+=' '+result.failed+' envoi(s) à réessayer.';
+    if (result.review) status.textContent+=' '+result.review+' envoi(s) ancien(s) à vérifier dans Resend.';
+  });
+};
+get('refresh-customers').onclick=event=>run(event.currentTarget,showSupport);
+document.querySelector('[data-tab="customers"]').addEventListener('click',()=>run(null,showSupport));
 const initialTab = new URLSearchParams(location.search).get('tab');
-tab(['products','settings','profile','printful','orders'].includes(initialTab) ? initialTab : 'products');
+tab(['products','settings','profile','printful','orders','customers'].includes(initialTab) ? initialTab : 'products');
 run(null,async ()=>{
   await refresh();
   if (!get('products').hidden) await syncCatalog();
+  if (!get('customers').hidden) await showSupport();
 });

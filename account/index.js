@@ -1,7 +1,7 @@
 const get = id => document.getElementById(id);
 const form = get('auth');
 const destination = new URLSearchParams(location.search).get('destination');
-const adminPath = ['products','settings','profile','printful','orders'].includes(destination) ? '/admin?tab='+destination : '/admin';
+const adminPath = ['products','settings','profile','printful','orders','customers'].includes(destination) ? '/admin?tab='+destination : '/admin';
 get('admin-link').href = adminPath;
 let mode = 'login';
 let hasOwner = false;

@@ -58,7 +58,7 @@ function storefrontHeader(path,settings,en) {
   return '<div class="bar">'+local(en,'Impression à la demande','Print on demand')+' · '+htmlEscape(countriesLabel(settings,en))+'</div>'+
     '<header class="site-header"><a class="brand" href="'+languagePath('/',en)+'" aria-label="TSŪ">TSŪ<span aria-hidden="true">✷</span></a>'+
     '<nav aria-label="'+local(en,'Collections','Collections')+'">'+navLink('/collections/t-shirts',en,'T-shirts','T-shirts')+navLink('/collections/accessoires',en,'Accessoires','Accessories')+'</nav>'+
-    '<div class="actions"><a class="account-link" href="/compte">'+local(en,'Mon compte','My account')+'</a>'+
+    '<div class="actions"><a class="account-link" href="'+local(en,'/espace-client','/en/account')+'">'+local(en,'Mon compte','My account')+'</a>'+
     '<a class="language-link" hreflang="'+local(en,'en','fr')+'" href="'+languagePath(path,!en)+'" aria-label="'+local(en,'English','Français')+'">'+local(en,'EN','FR')+'</a>'+
     '<button id="basket" type="button">'+local(en,'Panier','Cart')+' <b id="count">0</b></button></div></header>';
 }
@@ -77,13 +77,16 @@ function storefrontFooter(profile,en) {
     navLink('/contact',en,'Contact','Contact')+navLink('/mentions-legales',en,'Mentions légales','Legal notice')+
     navLink('/livraison-retours',en,'Livraison et retours','Shipping and returns')+
     navLink('/conditions-de-vente',en,'Conditions de vente','Terms of sale')+navLink('/confidentialite',en,'Confidentialité','Privacy')+
+    '<a href="'+local(en,'/espace-client','/en/account')+'#newsletter">Newsletter</a>'+
     '</nav></footer>';
 }
-function homeContent(items,settings,en) {
+function homeContent(items,settings,en,member) {
   const tag = settings[en?'tagEn':'tagFr'] || local(en,'Pour ceux qui savent.','For those who know.');
   const pitch = settings[en?'pitchEn':'pitchFr'] || local(en,'T-shirts et accessoires inspirés du manga et du folklore japonais.','T-shirts and accessories inspired by manga and Japanese folklore.');
-  const featured = items.filter(product=>product.featured);
-  const selection = (featured.length ? featured : items).slice(0,8);
+  const publicItems = items.filter(product=>canViewProduct(product,false));
+  const featured = publicItems.filter(product=>product.featured);
+  const selection = (featured.length ? featured : publicItems).slice(0,8);
+  const memberItems = member ? items.filter(product=>!canViewProduct(product,false)) : [];
   const collections = ['tee','acc'].map(type=>{
     const count = items.filter(product=>product.type===type).length;
     const description = type==='tee' ? local(en,'Des coupes classiques et oversize, des motifs à reconnaître au premier regard.','Classic and oversized fits with designs you can spot at a glance.')
@@ -98,6 +101,10 @@ function homeContent(items,settings,en) {
     '<section id="collections" class="shop-section"><h2>'+local(en,'Les collections','The collections')+'</h2><div class="collection-grid">'+collections+'</div></section>'+
     '<section id="collection" class="shop-section"><h2>'+local(en,featured.length?'À la une':'Dans la boutique',featured.length?'Featured':'In the shop')+'</h2>'+
     cards(selection,en)+'</section>'+
+    '<section class="shop-section about-shop"><h2>'+local(en,'Les sorties en avant-première','Early access to new drops')+'</h2><p>'+
+    local(en,'Inscris-toi à la newsletter pour découvrir les prochains designs et les pièces réservées aux abonnés.','Join the newsletter for early previews and subscriber-only designs.')+'</p>'+
+    '<a class="primary" href="'+local(en,'/espace-client','/en/account')+'#newsletter">'+local(en,'Gérer mon inscription','Manage my subscription')+'</a></section>'+
+    (member ? '<section class="shop-section" id="member-designs"><h2>'+local(en,'Les designs abonnés','Subscriber designs')+'</h2>'+cards(memberItems,en)+'</section>' : '')+
     '<section class="shop-section about-shop"><h2>'+local(en,'L’univers TSŪ','The world of TSŪ')+'</h2><p>'+
     local(en,'TSŪ réunit des pièces de tous les jours inspirées des mangas et du folklore japonais. Les articles sont imprimés ou brodés à la demande. La fabrication commence après la commande, puis le colis est expédié.',
       'TSŪ brings together everyday pieces inspired by manga and Japanese folklore. Items are printed or embroidered on demand. Production begins after an order is placed, then the parcel is shipped.')+'</p><p>'+
@@ -136,11 +143,11 @@ function shippingContent(settings,profile,en) {
     const rule = profile.shipping?.[code];
     return '<tr><th scope="row">'+htmlEscape(marketNames[code]?.[Number(en)])+'</th><td>'+
       (rule ? storefrontMoney(rule.fee,en) : local(en,'À confirmer','To be confirmed'))+'</td><td>'+
-      (rule ? rule.min+'–'+rule.max+' '+local(en,'jours ouvrables','business days') : local(en,'À confirmer','To be confirmed'))+'</td></tr>';
+      (rule?.min ? rule.min+'–'+rule.max+' '+local(en,'jours ouvrables','business days') : local(en,'Estimation selon le panier et le code postal','Estimated from your cart and postal code'))+'</td></tr>';
   }).join('');
   const preview = profile.shippingPreview ? '<p><strong>'+local(en,'Tarifs provisoires de test','Provisional test rates')+'</strong></p>' : '';
-  return preview+'<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Les délais du tableau couvrent la fabrication et le transport.',
-    'Each item is made after you order. Printful typically estimates 2–5 business days for production, plus transit time. The times in the table cover production and transit.')+'</p>'+
+  return preview+'<p>'+local(en,'Chaque article est fabriqué après la commande. Printful indique habituellement 2 à 5 jours ouvrables de production, auxquels s’ajoute le transport. Dans le panier, entre ton code postal pour obtenir une estimation Printful pour tes articles.',
+    'Each item is made after you order. Printful typically estimates 2–5 business days for production, plus transit time. Enter your postal code in the cart for a Printful estimate for your items.')+'</p>'+
     '<div class="table-wrap"><table><thead><tr><th scope="col">'+local(en,'Destination','Destination')+'</th><th scope="col">'+local(en,'Livraison standard','Standard shipping')+
     '</th><th scope="col">'+local(en,'Délai total estimé','Estimated total time')+'</th></tr></thead><tbody>'+rules+'</tbody></table></div>'+
     '<h2>'+local(en,'Suivi et problème de livraison','Tracking and delivery issues')+'</h2><p>'+
@@ -187,22 +194,27 @@ async function renderStorefront(request,env) {
   const headers = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':checkoutReturn ? 'no-referrer' : 'strict-origin-when-cross-origin'};
   if (!indexable) headers['X-Robots-Tag'] = 'noindex, nofollow';
   if (pathname==='/robots.txt') {
-    const rules = indexable ? 'User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n' :
+    const rules = indexable ? 'User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /espace-client\nDisallow: /en/account\nDisallow: /api/\nSitemap: '+origin+'/sitemap.xml\n' :
       'User-agent: *\nDisallow: /\n';
     return new Response(rules,{headers:{...headers,'Content-Type':'text/plain; charset=utf-8'}});
   }
-  const published = (await products(env)).filter(product=>product.published).sort((a,b)=>Number(b.featured)-Number(a.featured));
+  const all = await products(env);
+  const publiclyAvailable = all.filter(product=>canViewProduct(product,false));
   if (pathname==='/sitemap.xml') {
-    const pages = ['/', '/collections/t-shirts','/collections/accessoires',...published.map(productPath)];
+    const pages = ['/', '/collections/t-shirts','/collections/accessoires',...publiclyAvailable.map(productPath)];
     const urls = pages.flatMap(path=>[path,languagePath(path,true)]).map(path=>'<url><loc>'+htmlEscape(origin+path)+'</loc></url>').join('');
     return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls+'</urlset>',{
       headers:{...headers,'Content-Type':'application/xml; charset=utf-8'}
     });
   }
   const route = storefrontRoute(pathname);
+  const member = newsletterAccess(await customerSession(request,env),env);
+  const published = (member ? all.filter(product=>canViewProduct(product,true)) : publiclyAvailable)
+    .sort((a,b)=>Number(b.featured)-Number(a.featured));
   const {en} = route;
   const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
   const product = route.id ? published.find(item=>item.id===route.id) : null;
+  if (product && !canViewProduct(product,false)) headers['X-Robots-Tag'] = 'noindex, nofollow';
   const page = route.id ? (product ? 'product' : 'missing') : storefrontPaths[route.path];
   const path = product ? productPath(product) : route.id ? '/' : route.path;
   if (product && pathname !== languagePath(path,en)) return Response.redirect(origin+languagePath(path,en),301);
@@ -237,7 +249,7 @@ async function renderStorefront(request,env) {
     '<meta property="og:image" content="'+htmlEscape(safePhoto(product?.image) || origin+'/room.webp')+'">'+
     (schema ? '<script type="application/ld+json">'+jsonScript(schema)+'</script>' : '');
   let main;
-  if (page==='home') main = homeContent(published,settings,en);
+  if (page==='home') main = homeContent(published,settings,en,member);
   else if (page==='product') main = productContent(product,settings,en);
   else if (page==='tee' || page==='acc') main = '<section class="shop-section"><h1>'+heading+'</h1><p>'+
     (page==='tee' ? local(en,'Des T-shirts inspirés du manga, en coupe classique ou oversize selon le modèle.','Manga-inspired T-shirts in classic or oversized fits, depending on the design.') :
@@ -247,7 +259,7 @@ async function renderStorefront(request,env) {
     (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+'</article>';
   const client = {
     language:en?'en':'fr',checkoutMode:await checkoutMode(env,settings,profile),liveRequested:salesEnabled(env),countries:settings.countries,
-    shipping:profile.shipping ?? {},shippingPath:languagePath('/livraison-retours',en),
+    shipping:profile.shipping ?? {},shippingPreview:Boolean(profile.shippingPreview),shippingPath:languagePath('/livraison-retours',en),
     products:published.map(({id,name,price,material,variants})=>({id,name,price,material,variants:variants.map(({id,size,color,label})=>({id,size,color,label}))}))
   };
   const template = new TextDecoder().decode(Uint8Array.from(atob(assets['/'][1]),char=>char.charCodeAt(0)));

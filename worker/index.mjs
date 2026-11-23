@@ -46,7 +46,11 @@ function productData(input) {
   if (input.published && (!variants.length || variants.some(variant => !variant.syncId))) {
     fail('Associe chaque variante à Printful avant de publier.');
   }
-  return { id, name, price, image, type:input.type, fr:text(input.fr,1500), en:text(input.en,1500), material:text(input.material,250), care:text(input.care,500), sizing:text(input.sizing,500), safety:text(input.safety,1200),
+  const audience = ['newsletter','early'].includes(input.audience) ? input.audience : 'public';
+  const release = Date.parse(input.releaseAt);
+  if (audience==='early' && !Number.isFinite(release)) fail('Renseigne la date de sortie publique.');
+  return { id, name, price, image, type:input.type, audience, releaseAt:audience==='early' ? new Date(release).toISOString() : '',
+    fr:text(input.fr,1500), en:text(input.en,1500), material:text(input.material,250), care:text(input.care,500), sizing:text(input.sizing,500), safety:text(input.safety,1200),
     published: Boolean(input.published), featured:Boolean(input.featured), variants };
 }
 
@@ -83,13 +87,14 @@ async function handle(request, env) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
   const tab = searchParams.get('tab');
-  const deepLink = ['products','settings','profile','printful','orders'].includes(tab) ? tab : '';
+  const deepLink = ['products','settings','profile','printful','orders','customers'].includes(tab) ? tab : '';
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
   const account = pathname === '/compte' || pathname.startsWith('/compte/') || pathname.startsWith('/api/account/');
   if (method === 'POST' && pathname === '/api/stripe/webhook') return stripeWebhook(request,env,'test');
   if (method === 'POST' && pathname === '/api/stripe/webhook/live') return stripeWebhook(request,env,'live');
+  if (pathname === '/newsletter/desinscription') return unsubscribeNewsletter(request,env);
   // The private Sites gate verifies the owner before the separate TSŪ login.
   if ((admin || account) && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
     return owner ? json({ error:'Accès réservé au propriétaire.' },403)
@@ -97,6 +102,7 @@ async function handle(request, env) {
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
+  if (pathname.startsWith('/api/customer/')) return customerRoute(request,env,pathname.slice('/api/customer/'.length));
   if (pathname.startsWith('/api/account/')) return accountRoute(request,env,pathname.slice('/api/account/'.length),owner,email);
   if (admin && pathname !== '/admin/style.css' && !await ownerSession(request,env,owner)) {
     return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(deepLink ? '?destination='+deepLink : ''),302)
@@ -115,13 +121,23 @@ async function handle(request, env) {
   }
   if (method === 'GET' && pathname === '/api/catalog') {
     const settings = await storefront(env);
-    const items = (await products(env)).filter(product=>product.published)
+    const member = newsletterAccess(await customerSession(request,env),env);
+    const items = (await products(env)).filter(product=>canViewProduct(product,member))
       .sort((a,b)=>Number(b.featured)-Number(a.featured))
-      .map(product=>({ ...product, variants:product.variants.map(({syncId,...variant})=>variant) }));
+      .map(product=>({ ...product, variants:product.variants.map(({syncId,catalogId,...variant})=>variant) }));
     return json({ items, settings, stripe:await stripeEnabled(env) });
   }
   if (method === 'POST' && pathname === '/api/checkout/result' && (owner || salesEnabled(env))) return checkoutResult(request,env);
   if (method === 'POST' && pathname === '/api/checkout' && (owner || salesEnabled(env))) return checkout(request,env,origin);
+  if (method === 'POST' && pathname === '/api/delivery/estimate' && (owner || salesEnabled(env))) return deliveryQuote(request,env);
+  if (method === 'GET' && pathname === '/api/admin/customers') {
+    const {count} = await env.DB.prepare('SELECT COUNT(*) AS count FROM customers WHERE verified_at IS NOT NULL AND newsletter_at IS NOT NULL').bind().first();
+    return json({tickets:await customerTickets(env),count,emailReady:customerEmailReady(env)});
+  }
+  if (method === 'GET' && pathname === '/api/admin/newsletter.csv') return newsletterExport(env);
+  if (method === 'POST' && pathname === '/api/admin/newsletter/send') return sendDesignAnnouncement(request,env);
+  if (method === 'POST' && pathname === '/api/admin/tickets/reply') return replyToTicket(env,await body(request));
+  if (method === 'POST' && pathname === '/api/admin/tickets/status') return setTicketStatus(request,env);
   if (method === 'POST' && pathname === '/api/admin/printful/import') return importPrintfulPage(env,(await body(request)).offset);
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
   if (method === 'POST' && pathname === '/api/admin/stripe') return saveStripeConnection(request,env);

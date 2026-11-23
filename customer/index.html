@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Espace client | TSŪ</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/customer/style.css">
+<script type="module" src="/customer/index.js"></script>
+</head>
+<body>
+<header class="site-header"><a class="brand" id="shop-link" href="/">TSŪ<span aria-hidden="true">✷</span></a><nav><a id="language" href="/en/account" hreflang="en">EN</a></nav></header>
+<main class="shop-section client">
+<h1 id="title">Espace client</h1>
+<p id="notice" class="action-feedback" role="status"></p>
+<section id="guest" hidden>
+<div class="client-actions"><button type="button" id="open-login">Se connecter</button><button type="button" id="open-register">Créer un compte</button></div>
+<form id="auth" class="client-form">
+<h2 id="auth-title">Se connecter</h2>
+<label><span id="email-label">Adresse e-mail</span><input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+<label><span id="password-label">Mot de passe</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+<button type="button" id="password-toggle" aria-pressed="false">Afficher le mot de passe</button>
+<p id="password-hint" hidden>15 caractères minimum.</p>
+<button type="submit" id="auth-submit" class="primary">Se connecter</button>
+</form>
+<p id="guest-news" hidden>Crée ton compte pour t’inscrire à la newsletter et accéder aux designs réservés.</p>
+</section>
+<div id="client-panel" hidden>
+<div class="client-actions"><p id="client-email"></p><button id="signout" type="button">Se déconnecter</button></div>
+<nav class="client-actions" id="client-navigation"><a href="#orders">Commandes</a><a href="#tickets">Tickets</a><a href="#newsletter">Newsletter</a></nav>
+<section id="orders"><h2 id="orders-title">Mes commandes</h2><div id="order-list"></div></section>
+<section id="tickets"><h2 id="tickets-title">Mes tickets</h2>
+<form id="ticket-form" class="client-form">
+<label><span id="ticket-order-label">Commande associée (facultatif)</span><select name="orderId"></select></label>
+<label><span id="ticket-subject-label">Sujet</span><input name="subject" maxlength="120" required></label>
+<label><span id="ticket-message-label">Message</span><textarea name="message" maxlength="4000" rows="4" required></textarea></label>
+<button type="submit" id="ticket-submit" class="primary">Ouvrir un ticket</button>
+</form>
+<div id="ticket-list"></div>
+</section>
+<section id="newsletter"><h2>Newsletter</h2>
+<p id="newsletter-detail">Reçois les prochains designs en avant-première et accède aux pièces réservées aux abonnés.</p>
+<p id="newsletter-state"></p>
+<p><a id="privacy" href="/confidentialite">Politique de confidentialité</a></p>
+<div class="client-actions"><button id="newsletter-choice" type="button"></button><button id="request-verification" type="button" hidden>Recevoir le lien de confirmation</button><button id="confirm-verification" type="button" hidden>Confirmer mon adresse</button><a id="member-designs" href="/#member-designs" hidden>Voir les designs abonnés</a></div>
+</section>
+</div>
+</main>
+</body>
+</html>

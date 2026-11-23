@@ -1,0 +1,14 @@
+.client { max-width: 65rem; }
+.client [hidden] { display: none !important; }
+.client section { scroll-margin-top: 2rem; margin-block: 1.5rem; }
+.client-actions { display:flex; gap:.8rem; flex-wrap:wrap; align-items:center; }
+.client button,.client input,.client select,.client textarea { font:inherit; }
+.client-form,.client-entry { border:2px solid var(--ink,#1b1820); background:#fff; padding:1rem; margin:1rem 0; }
+.client-form { display:grid; gap:.7rem; max-width:36rem; }
+.client-form h2,.client-form p {margin:0;}
+.client-form label {display:grid; gap:.35rem; min-width:0;}
+.client input,.client select,.client textarea {width:100%; padding:.55rem;}
+.client textarea {resize:vertical;}
+.client button {justify-self:start;}
+.client-entry p {overflow-wrap:anywhere;}
+.ticket-message {white-space:pre-wrap; overflow-wrap:anywhere;}

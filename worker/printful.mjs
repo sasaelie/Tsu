@@ -36,7 +36,7 @@ function importVariant(variant) {
   if (!Number.isSafeInteger(syncId) || syncId < 1 || !variant.synced || variant.is_ignored === true) return null;
   const parts = /\(([^()]+)\s+\/\s+([^()]+)\)$/.exec(variant.product?.name ?? '');
   return {
-    id:'pfv-'+syncId, syncId,
+    id:'pfv-'+syncId, syncId, catalogId:Number(variant.variant_id) || undefined,
     size:text(variant.size || parts?.[2],32),
     color:text(variant.color || parts?.[1],40),
     label:text(variant.name,100)

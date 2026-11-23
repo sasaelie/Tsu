@@ -1,7 +1,7 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/index.js"></script></head>
 <body><header><a href="/">TSŪ <span>Boutique</span></a><a href="/compte"><span>Mon compte</span></a></header>
 <main><h1>Gérer TSŪ</h1><p id="identity"></p><p id="notice" role="status" aria-live="polite"></p>
-<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button></nav>
+<nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button><button data-tab="customers">Clients et newsletter</button></nav>
 <section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
 <label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="acc">Accessoire</option></select></label>
@@ -11,6 +11,10 @@
 <label>Guide des tailles <textarea name="sizing" maxlength="500"></textarea></label>
 <label>Conseils d’entretien <textarea name="care" maxlength="500"></textarea></label>
 <label>Fabricant, coordonnées et sécurité <textarea name="safety" maxlength="1200"></textarea></label></div>
+<fieldset><legend>Visibilité du design</legend>
+<label>Public <select name="audience"><option value="public">Tout le monde</option><option value="early">Avant-première abonnés, puis public</option><option value="newsletter">Abonnés à la newsletter uniquement</option></select></label>
+<label id="release-field" hidden>Sortie publique, heure de Bruxelles <input type="datetime-local" name="releaseAt"></label>
+</fieldset>
 <fieldset><legend>Variantes Printful</legend><div id="variants"></div><button type="button" id="add-variant">Ajouter une variante</button></fieldset>
 <div class="checks"><label><input type="checkbox" name="published"> Publier dans la boutique</label><label><input type="checkbox" name="featured"> Mettre en avant</label></div>
 <button type="submit">Enregistrer le produit</button></form></section>
@@ -35,7 +39,7 @@
 </div></fieldset>
 <fieldset><legend>Livraison standard</legend>
 <p id="trial-shipping-note" hidden>Les tarifs préremplis sont provisoires et servent aux commandes de test.</p>
-<p>Le délai total inclut la fabrication et le transport. Utilise les frais que tu veux facturer par commande. Saisis 0 si tu offres les frais.</p>
+<p>Le panier demande à Printful une estimation selon les articles et le code postal. Les délais saisis ici servent de référence si cette estimation est indisponible. Saisis 0 si tu offres les frais.</p>
 <div class="fields">
 <div><h3>Belgique</h3><label>Frais en euros <input name="BEFee" type="number" min="0" max="1000" step=".01"></label><label>Délai minimum en jours ouvrables <input name="BEMin" type="number" min="1" max="60"></label><label>Délai maximum en jours ouvrables <input name="BEMax" type="number" min="1" max="60"></label></div>
 <div><h3>France</h3><label>Frais en euros <input name="FRFee" type="number" min="0" max="1000" step=".01"></label><label>Délai minimum en jours ouvrables <input name="FRMin" type="number" min="1" max="60"></label><label>Délai maximum en jours ouvrables <input name="FRMax" type="number" min="1" max="60"></label></div>
@@ -85,5 +89,17 @@
 </details>
 <p id="stripe-readiness" role="status"></p>
 <div class="heading"><button id="refresh-orders">Actualiser les commandes</button><a href="/#collection">Ouvrir le catalogue</a></div><div id="order-list"></div>
+</section>
+<section id="customers" hidden>
+<h2>Clients et newsletter</h2>
+<div class="heading"><button type="button" id="refresh-customers">Actualiser</button><a href="/api/admin/newsletter.csv">Exporter les abonnés confirmés (CSV)</a></div>
+<p id="newsletter-summary" role="status"></p>
+<form id="announcement-form" hidden>
+<h3>Annoncer un design aux abonnés</h3>
+<label>Design <select name="productId" required></select></label>
+<button type="submit">Envoyer l’annonce</button>
+<p id="announcement-status" role="status"></p>
+</form>
+<h3>Tickets clients</h3><div id="support-list"></div>
 </section>
 </main></body></html>

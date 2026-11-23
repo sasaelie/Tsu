@@ -1,25 +1,35 @@
-async function checkout(request, env, origin) {
-  const { lines, country, language, direct } = await body(request);
-  const [config, profile] = await Promise.all([storefront(env),shopProfile(env)]);
-  const mode = await checkoutMode(env,config,profile);
-  const stripeKey = mode === 'live' ? liveStripeKey(env) : mode === 'test' ? await activeStripeKey(env) : null;
-  if (!stripeKey) fail('Le paiement est momentanément indisponible.',503);
+async function checkoutItems(env, config, customer, country, lines) {
   if (!config.countries.includes(country) || !Array.isArray(lines) || !lines.length || lines.length > 20 || lines.some(line=>!line || typeof line !== 'object')) fail('Panier ou pays invalide.');
-  const shipping = profile.shipping?.[country];
-  if (!shipping) fail('Configure les frais et le délai de livraison de ce pays dans l’administration.',409);
   const available = await products(env);
-  const items = lines.map(line => {
-    const product = available.find(item => item.id === line.id && item.published);
+  const member = newsletterAccess(customer,env);
+  return lines.map(line => {
+    const product = available.find(item => item.id === line.id && canViewProduct(item,member));
     const variant = product?.variants.find(item => item.id === line.variantId);
     if (!variant?.syncId || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 20) fail('Un article du panier est indisponible.');
     const label = [variant.size,variant.color].filter(Boolean).join(' · ') || variant.label;
-    return { name:[product.name,label].filter(Boolean).join(' · '), price:product.price, syncId:variant.syncId, quantity:line.quantity };
+    return { path:productPath(product), name:[product.name,label].filter(Boolean).join(' · '), price:product.price,
+      syncId:variant.syncId, catalogId:variant.catalogId, quantity:line.quantity };
   });
+}
+
+async function checkout(request, env, origin) {
+  const { lines, country, language, direct, postalCode } = await body(request);
+  const [config,profile,customer] = await Promise.all([storefront(env),shopProfile(env),customerSession(request,env)]);
+  const mode = await checkoutMode(env,config,profile);
+  const stripeKey = mode === 'live' ? liveStripeKey(env) : mode === 'test' ? await activeStripeKey(env) : null;
+  if (!stripeKey) fail('Le paiement est momentanément indisponible.',503);
+  const items = await checkoutItems(env,config,customer,country,lines);
+  const shipping = profile.shipping?.[country];
+  if (!shipping) fail('Configure les frais et le délai de livraison de ce pays dans l’administration.',409);
+  const zip = deliveryZip(postalCode,country);
+  const dates = zip ? await findDeliveryDates(env,items,country,zip) : null;
+  const fallback = !profile.shippingPreview && shipping.min ? {...shipping,unit:'business_day'} : null;
+  const estimate = dates ?? fallback;
   const id = crypto.randomUUID();
   const english = language === 'en';
   const home = languagePath('/',english);
-  const directProduct = direct === true && lines.length === 1 ? available.find(item=>item.id === lines[0].id) : null;
-  const returnPath = directProduct ? languagePath(productPath(directProduct),english) : home;
+  const directProduct = direct === true && items.length === 1;
+  const returnPath = directProduct ? languagePath(items[0].path,english) : home;
   const form = new URLSearchParams({
     mode:'payment', success_url:origin+home+'?checkout_session={CHECKOUT_SESSION_ID}',
     cancel_url:origin+returnPath+'?checkout=cancelled'+(directProduct ? '' : '#collection'),
@@ -29,13 +39,17 @@ async function checkout(request, env, origin) {
     'shipping_options[0][shipping_rate_data][display_name]':language === 'en' ? 'Standard delivery' : 'Livraison standard',
     'shipping_options[0][shipping_rate_data][fixed_amount][currency]':'eur',
     'shipping_options[0][shipping_rate_data][fixed_amount][amount]':String(shipping.fee),
-    'shipping_options[0][shipping_rate_data][delivery_estimate][minimum][unit]':'business_day',
-    'shipping_options[0][shipping_rate_data][delivery_estimate][minimum][value]':String(shipping.min),
-    'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][unit]':'business_day',
-    'shipping_options[0][shipping_rate_data][delivery_estimate][maximum][value]':String(shipping.max),
     'shipping_address_collection[allowed_countries][0]':country,
     integration_identifier:'tsu-checkout-fzxqcrmt', client_reference_id:id
   });
+  if (estimate) {
+    for (const [bound,days] of [['minimum',estimate.min],['maximum',estimate.max]]) {
+      const field = 'shipping_options[0][shipping_rate_data][delivery_estimate]['+bound+']';
+      form.set(field+'[unit]',estimate.unit);
+      form.set(field+'[value]',String(days));
+    }
+  }
+  if (customer?.verified_at) form.set('customer_email',customer.email);
   if (mode === 'live') {
     form.set('automatic_tax[enabled]','true');
     form.set('shipping_options[0][shipping_rate_data][tax_behavior]','inclusive');
@@ -51,8 +65,9 @@ async function checkout(request, env, origin) {
   const session = await stripeRequest(stripeKey,'/checkout/sessions',form,id);
   if (session.livemode !== (mode === 'live') || !stripeSessionPattern.test(session.id ?? '') ||
       !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe invalide.',502);
-  await env.DB.prepare('INSERT INTO shop_orders (id, session_id, data) VALUES (?, ?, ?)')
-    .bind(id,session.id,JSON.stringify({ id,mode,country,items,shippingFee:shipping.fee,payment:'unpaid',printful:'none' })).run();
+  const savedItems = items.map(({name,price,syncId,quantity})=>({name,price,syncId,quantity}));
+  await env.DB.prepare('INSERT INTO shop_orders (id,session_id,data,customer_id) VALUES (?,?,?,?)')
+    .bind(id,session.id,JSON.stringify({ id,mode,country,items:savedItems,shippingFee:shipping.fee,payment:'unpaid',printful:'none' }),customer?.id ?? null).run();
   return json({ url:session.url, sessionId:session.id });
 }
 

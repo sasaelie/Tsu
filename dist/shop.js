@@ -11,6 +11,7 @@ const cart = createCart(config.products,count=>{get('count').textContent=count;}
 const pendingCartKey = 'tsu-pending-cart';
 let directOrder = null;
 let country = config.countries[0];
+const postalCodes = {};
 
 function element(tag, label, attrs = {}) {
   const node = document.createElement(tag);
@@ -59,11 +60,44 @@ function checkoutSummary(items, shipping) {
     element('dt',t('Sous-total','Subtotal')),element('dd',amount(subtotal)),
     element('dt',t('Livraison','Shipping')),element('dd',shipping ? amount(shipping.fee) : t('À confirmer','To be confirmed'))
   );
-  if (shipping) summary.append(
-    element('dt',t('Délai total estimé','Estimated total time')),element('dd',shipping.min+'–'+shipping.max+' '+t('jours ouvrables','business days')),
-    element('dt',t('Total','Total')),element('dd',amount(subtotal+shipping.fee))
-  );
+  if (shipping) summary.append(element('dt',t('Total','Total')),element('dd',amount(subtotal+shipping.fee)));
   return summary;
+}
+function deliveryControls(items,shipping) {
+  const section = element('div',null,{class:'row'});
+  const fallback = !config.shippingPreview && shipping?.min
+    ? shipping.min+'–'+shipping.max+' '+t('jours ouvrables','business days')
+    : t('Fabrication habituelle : 2 à 5 jours ouvrables, puis transport.','Typical production: 2–5 business days, plus shipping.');
+  const status = element('p',fallback,{role:'status'});
+  const destination = country;
+  const label = element('label',t('Code postal de livraison','Shipping postal code'));
+  const input = element('input',null,{type:'text',inputmode:'numeric',autocomplete:'postal-code',maxlength:'5'});
+  input.value = postalCodes[destination] ?? '';
+  label.append(input);
+  const estimate = button(t('Estimer avec Printful','Get a Printful estimate'),async()=>{
+    const postalCode = input.value.trim();
+    if (!(destination==='BE'?/^\d{4}$/:/^\d{5}$/).test(postalCode)) {
+      status.textContent=t('Vérifie le code postal pour ce pays.','Check the postal code for this country.');
+      input.focus();
+      return;
+    }
+    estimate.disabled=true;
+    status.textContent=t('Recherche du délai…','Checking delivery dates…');
+    try {
+      const response = await fetch('/api/delivery/estimate',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({country:destination,postalCode,lines:items})});
+      const data = await response.json();
+      if (!response.ok || !data.dates) throw new Error();
+      const {start,end} = data.dates;
+      const format = new Intl.DateTimeFormat(english?'en-IE':'fr-BE',{day:'numeric',month:'long',timeZone:'UTC'});
+      status.textContent=t('Livraison estimée par Printful : ','Estimated delivery from Printful: ')+format.formatRange(new Date(start),new Date(end));
+    } catch {
+      status.textContent=t('Estimation indisponible. ','Estimate unavailable. ')+fallback;
+    } finally { estimate.disabled=false; }
+  });
+  input.addEventListener('input',()=>{postalCodes[destination]=input.value; status.textContent=fallback;});
+  section.append(label,estimate,status);
+  return section;
 }
 function renderCheckout() {
   const title = directOrder ? t('Ton achat','Your purchase') : t('Ton panier','Your cart');
@@ -88,7 +122,7 @@ function renderCheckout() {
   const shipping = config.shipping[country];
   const result = element('p',null,{class:'action-feedback',role:'status',id:'checkout-result'});
   const link = element('a',t('Livraison et retours','Shipping and returns'),{href:config.shippingPath});
-  content.append(list,label,checkoutSummary(items,shipping),link);
+  content.append(list,label,checkoutSummary(items,shipping),deliveryControls(items,shipping),link);
   if (!config.liveRequested) content.append(element('p',t('Préproduction · Aucun paiement réel','Preview · No real payments')));
   if (config.checkoutMode && shipping) {
     const label = config.checkoutMode === 'live' ? t('Continuer vers le paiement','Continue to payment') :
@@ -107,7 +141,7 @@ async function pay(control,items,result) {
   try {
     const response = await fetch('/api/checkout',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({country,lines:items,language:config.language,direct:Boolean(directOrder)})
+      body:JSON.stringify({country,lines:items,language:config.language,direct:Boolean(directOrder),postalCode:postalCodes[country]})
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);

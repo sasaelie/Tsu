@@ -109,6 +109,10 @@ async function refresh() {
   settingsForm.elements.be.checked = state.settings.countries.includes('BE');
   settingsForm.elements.fr.checked = state.settings.countries.includes('FR');
   get('printful-status').textContent = state.printful ? 'Connecté à '+(state.printfulStore ?? 'Printful')+'.' : 'Printful à connecter.';
+  get('printful-next').hidden = !state.printful;
+  get('printful-credentials-label').textContent = state.printful ? 'Remplacer le jeton' : 'Configurer la connexion';
+  get('printful-credentials').open = !state.printful;
+  get('printful-credentials').hidden = false;
   renderOrders();
 }
 function tab(id) {
@@ -146,6 +150,10 @@ settingsForm.onsubmit = event=>{
     await api('settings',data);
     notice('Boutique mise à jour.');
   });
+};
+get('open-products').onclick = ()=>{
+  tab('products');
+  document.querySelector('[data-tab="products"]').focus();
 };
 get('printful-form').onsubmit = event=>{
   event.preventDefault();

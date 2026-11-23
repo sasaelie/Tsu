@@ -15,6 +15,21 @@
 <label>Texte français <textarea name="pitchFr" maxlength="300"></textarea></label><label>Texte anglais <textarea name="pitchEn" maxlength="300"></textarea></label></div>
 <fieldset><legend>Pays de livraison</legend><div class="checks"><label><input type="checkbox" name="be"> Belgique</label><label><input type="checkbox" name="fr"> France</label></div></fieldset>
 <button>Enregistrer la boutique</button></form></section>
-<section id="printful" hidden><h2>Connexion Printful</h2><p id="printful-status"></p><p>Crée un jeton privé pour une seule boutique dans le <a href="https://developers.printful.com/tokens/add-new-token" target="_blank" rel="noopener noreferrer">portail Printful</a>. Autorise la lecture des produits synchronisés et la gestion des commandes.</p><form id="printful-form"><label>Jeton privé Printful <input name="token" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required></label><p>Le test vérifie la lecture du catalogue et des commandes.</p><button type="submit">Tester et connecter</button></form></section>
+<section id="printful" hidden>
+<h2>Printful</h2>
+<p id="printful-status" role="status"></p>
+<div id="printful-next" hidden>
+<p>Dans la fiche d’un produit, associe chaque taille et couleur à sa variante Printful.</p>
+<button type="button" id="open-products">Gérer les produits</button>
+</div>
+<details id="printful-credentials" hidden>
+<summary id="printful-credentials-label">Configurer la connexion</summary>
+<form id="printful-form">
+<p>Dans le <a href="https://developers.printful.com/tokens/add-new-token" target="_blank" rel="noopener noreferrer">portail Printful</a>, crée un jeton privé pour une seule boutique. Autorise la lecture des produits synchronisés et la gestion des commandes.</p>
+<label>Jeton privé Printful <input name="token" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required></label>
+<button type="submit">Tester et connecter</button>
+</form>
+</details>
+</section>
 <section id="orders" hidden><h2>Commandes et tests</h2><p id="connections"></p><div class="heading"><button id="refresh-orders">Actualiser les commandes</button><a href="/#collection">Ouvrir le catalogue</a></div><div id="order-list"></div></section>
 </main></body></html>

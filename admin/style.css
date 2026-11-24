@@ -60,3 +60,5 @@ textarea { resize: vertical; }
 
 #ai-status:not(:empty), #ai-request-status:not(:empty) { padding: .65rem; }
 [data-tone=pending] { background: #e8ecff; color: #263b83; }
+
+#login-result:not(:empty) { padding: .65rem; }

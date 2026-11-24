@@ -38,6 +38,10 @@ async function ownerRecord(env) {
   return env.DB.prepare('SELECT * FROM tsu_owner WHERE id = 1').bind().first();
 }
 
+function matchesOwner(record, subject, email) {
+  return Boolean(record && subject && email && record.subject === subject && normalizedEmail(record.email) === normalizedEmail(email));
+}
+
 async function ownerSession(request, env, subject) {
   const token = sessionToken(request);
   if (!subject || !token) return null;
@@ -61,8 +65,9 @@ async function accountRoute(request, env, action, subject, platformEmail) {
   const email = normalizedEmail(platformEmail);
   if (env.ADMIN_EMAIL && email !== normalizedEmail(env.ADMIN_EMAIL)) return json({error:'Accès propriétaire requis.'},403);
   if (action === 'state' && request.method === 'GET') {
-    const account = await ownerSession(request,env,subject);
     const record = await ownerRecord(env);
+    if (record && !matchesOwner(record,subject,email)) return json({error:'Ouvre cette page avec le compte ChatGPT qui possède la boutique TSŪ.'},403);
+    const account = await ownerSession(request,env,subject);
     return json({hasOwner:Boolean(record),signedIn:Boolean(account),email:account?.email ?? email});
   }
   if (request.method !== 'POST') return json({error:'Méthode refusée.'},405);
@@ -91,7 +96,7 @@ async function accountRoute(request, env, action, subject, platformEmail) {
     if (!result.meta.changes) return json({error:'Le compte propriétaire existe déjà. Connecte-toi.'},409);
     return startSession(request,env);
   }
-  if (!owner || owner.email !== email || owner.subject !== subject) return json({error:'Adresse e-mail ou mot de passe invalide.'},401);
+  if (!matchesOwner(owner,subject,email)) return json({error:'Adresse e-mail ou mot de passe invalide.'},401);
   const now = epoch();
   const attempt = await env.DB.prepare(
     'UPDATE tsu_owner SET failed_attempts = CASE WHEN retry_after <= ? THEN 1 ELSE failed_attempts + 1 END, retry_after = CASE WHEN retry_after <= ? THEN ? ELSE retry_after END WHERE id = 1 AND (retry_after <= ? OR failed_attempts < 5)'

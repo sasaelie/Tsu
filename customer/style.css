@@ -12,3 +12,5 @@
 .client button {justify-self:start;}
 .client-entry p {overflow-wrap:anywhere;}
 .ticket-message {white-space:pre-wrap; overflow-wrap:anywhere;}
+
+.owner-access a { display: inline-block; padding: .6rem .8rem; border: 2px solid; background: var(--yellow); font-weight: 800; }

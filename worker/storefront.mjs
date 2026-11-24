@@ -91,7 +91,7 @@ function storefrontHeader(path,settings,en,departments) {
     '<nav aria-label="'+local(en,'Navigation principale','Main navigation')+'">'+
     navLink('/',en,'Accueil','Home')+'<details class="shop-menu"><summary>'+local(en,'Boutique','Shop')+'</summary>'+
     catalogLinks(departments,path,en)+'</details>'+navLink('/blog',en,'Journal','Journal')+'</nav>'+
-    '<div class="actions"><a class="account-link" href="'+local(en,'/espace-client','/en/account')+'">'+local(en,'Mon compte','My account')+'</a>'+
+    '<div class="actions"><a class="account-link" href="'+local(en,'/espace-client','/en/account')+'">'+local(en,'Espace client','Customer account')+'</a>'+
     '<a class="language-link" hreflang="'+local(en,'en','fr')+'" href="'+languagePath(path,!en)+'" aria-label="'+local(en,'English','Français')+'">'+local(en,'EN','FR')+'</a>'+
     '<button id="basket" type="button">'+local(en,'Panier','Cart')+' <b id="count">0</b></button></div></header>';
 }

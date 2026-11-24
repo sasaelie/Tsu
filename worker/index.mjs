@@ -86,8 +86,9 @@ const products = env => readData(env.DB,'SELECT data FROM products ORDER BY rowi
 async function handle(request, env) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
-  const tab = searchParams.get('tab');
-  const deepLink = ['products','settings','profile','printful','orders','customers','journal'].includes(tab) ? tab : '';
+  const section = searchParams.get(pathname.startsWith('/compte')?'destination':'tab');
+  const deepLink = ['products','settings','profile','printful','orders','customers','journal'].includes(section) ? section : '';
+  const query = deepLink ? (pathname.startsWith('/compte')?'?destination=':'?tab=')+deepLink : '';
   const admin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
@@ -99,7 +100,7 @@ async function handle(request, env) {
   // The private Sites gate verifies the owner before the separate TSŪ login.
   if ((admin || account) && (!owner || (env.ADMIN_EMAIL && email?.toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()))) {
     return owner ? json({ error:'Accès réservé au propriétaire.' },403)
-      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname + (pathname === '/admin' && deepLink ? '?tab='+deepLink : '')),302)
+      : pathname === '/admin' || pathname === '/compte' ? Response.redirect(origin+'/signin-with-chatgpt?returnTo='+encodeURIComponent(pathname+query),302)
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
@@ -109,10 +110,19 @@ async function handle(request, env) {
     return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(deepLink ? '?destination='+deepLink : ''),302)
       : json({error:'Connecte-toi à ton compte TSŪ.'},401);
   }
-  if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);
+  if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte'+query,302);
   if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin'+(deepLink ? '?tab='+deepLink : ''),302);
   if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === journalFeedPath(false) || pathname === journalFeedPath(true) || storefrontRoute(pathname))) {
     return renderStorefront(request,env);
+  }
+  if (method === 'GET' && ['/espace-client','/en/account'].includes(pathname)) {
+    const en=pathname==='/en/account';
+    const ownerLink=owner && email && matchesOwner(await ownerRecord(env),owner,email)
+      ? '<p class="owner-access"><a href="/admin?tab=journal">'+local(en,'Ouvrir mon espace administrateur','Open my owner dashboard')+'</a></p>' : '';
+    const html=new TextDecoder().decode(Uint8Array.from(atob(assets[pathname][1]),char=>char.charCodeAt(0)));
+    return new Response(html.replace('<!-- OWNER_ACCESS -->',ownerLink),{headers:{
+      'Content-Type':'text/html; charset=utf-8','X-Content-Type-Options':'nosniff','Cache-Control':'no-store'
+    }});
   }
   if (method === 'GET' && Object.hasOwn(assets,pathname)) {
     const [type, data] = assets[pathname];

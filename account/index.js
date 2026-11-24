@@ -10,7 +10,9 @@ async function request(path, data) {
   const response = await fetch('/api/account/'+path,data === undefined ? undefined : {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
   });
-  const payload = await response.json();
+  let payload;
+  try { payload = await response.json(); }
+  catch { throw new Error('Ouvre TSŪ dans ton navigateur et connecte-toi au compte ChatGPT propriétaire.'); }
   if (!response.ok) throw new Error(payload.error || 'Action impossible.');
   return payload;
 }
@@ -33,17 +35,17 @@ function selectMode(next) {
   showPassword(false);
   get('explanation').textContent = register
     ? 'L’adresse du compte propriétaire est reprise automatiquement. Choisis ton mot de passe TSŪ.'
-    : 'Utilise l’adresse et le mot de passe de ton compte TSŪ.';
+    : 'Utilise le mot de passe que tu as choisi pour l’administration de la boutique.';
   document.querySelectorAll('[data-mode]').forEach(button=>{
     if (button.dataset.mode === next) button.setAttribute('aria-current','true');
     else button.removeAttribute('aria-current');
   });
 }
-async function run(button, action) {
+async function run(button, action, status = get('notice')) {
   if (button) button.disabled = true;
-  get('notice').textContent = '';
+  status.textContent = '';
   try { await action(); }
-  catch (error) { get('notice').textContent = error.message; }
+  catch (error) { status.textContent = error.message; status.dataset.tone='error'; }
   finally { if (button) button.disabled = false; }
 }
 async function refresh() {
@@ -59,14 +61,19 @@ async function refresh() {
 document.querySelectorAll('[data-mode]').forEach(button=>{button.onclick=()=>selectMode(button.dataset.mode);});
 form.onsubmit = event=>{
   event.preventDefault();
+  const status=get('login-result');
   return run(event.submitter,async ()=>{
+    status.dataset.tone='pending';
+    status.textContent='Connexion en cours…';
     const values = Object.fromEntries(new FormData(form));
     await request(mode, values);
+    const account=await request('state');
+    if (!account.signedIn) throw new Error('Le mot de passe est accepté, mais ta session ne reste pas ouverte. Ouvre TSŪ directement dans Chrome, puis reconnecte-toi ici.');
     location.assign(adminPath);
-  });
+  },status);
 };
 get('logout').onclick = event=>run(event.currentTarget,async ()=>{
   await request('logout',{});
   await refresh();
 });
-run(null,refresh);
+run(null,refresh).finally(()=>{get('loading').hidden=true;});

@@ -8,6 +8,16 @@ const amount = cents=>new Intl.NumberFormat(english?'en-IE':'fr-BE',{style:'curr
 const modal = get('checkout');
 const content = get('cartContent');
 const cart = createCart(config.products,count=>{get('count').textContent=count;});
+const shopMenu = document.querySelector('.shop-menu');
+document.addEventListener('click',event=>{
+  if (shopMenu?.open && !shopMenu.contains(event.target)) shopMenu.open=false;
+});
+shopMenu?.addEventListener('keydown',event=>{
+  if (event.key==='Escape' && shopMenu.open) {
+    shopMenu.open=false;
+    shopMenu.querySelector('summary').focus();
+  }
+});
 const pendingCartKey = 'tsu-pending-cart';
 let directOrder = null;
 let country = config.countries[0];

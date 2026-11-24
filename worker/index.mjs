@@ -24,7 +24,7 @@ function productData(input) {
   const name = text(input.name, 100);
   const price = input.price;
   const image = text(input.image, 2048);
-  if (!idPattern.test(id) || !name || !['tee','acc'].includes(input.type) ||
+  if (!idPattern.test(id) || !name || !catalogTypes.includes(input.type) ||
       !Number.isInteger(price) || price < 50 || price > 999900) fail('Fiche produit invalide.');
   if (image) {
     let url;

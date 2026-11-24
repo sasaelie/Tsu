@@ -57,6 +57,7 @@ function importedProduct(source, detail) {
   const price = prices.length && prices.every(value=>value === prices[0]) ? prices[0] : null;
   const names = [product.name,...synced.map(variant=>variant.product?.name)].filter(Boolean).join(' ');
   const type = /\b(?:t[\s-]?shirts?|tees?)\b/i.test(names) ? 'tee'
+    : /\b(?:hoodies?|hooded|sweat(?:[\s-]?shirts?)?s?|pulls?|jumpers?|sweaters?)\b/i.test(names) ? 'sweat'
     : /\b(?:totes?|bags?|sacs?|casquettes?|caps?|hats?|beanies?|bonnets?|stickers?|mugs?|accessoires?)\b/i.test(names) ? 'acc' : '';
   const thumbnail = [product.thumbnail_url,source.thumbnail_url].find(value=>{
     try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && value.length <= 2048; }

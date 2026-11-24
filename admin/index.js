@@ -145,7 +145,7 @@ function renderProducts() {
   if (!state.products.length) list.append(element('p','Aucun produit enregistré. Le catalogue de démonstration reste disponible.'));
   for (const product of state.products) {
     const row = element('div',null,'record');
-    const category = {tee:'T-shirts',acc:'Accessoires'}[product.type];
+    const category = {tee:'T-shirts',sweat:'Pulls et sweats',acc:'Accessoires'}[product.type];
     const title = element('div',null,'product-summary');
     if (product.image) {
       const image = document.createElement('img');

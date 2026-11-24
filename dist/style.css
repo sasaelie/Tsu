@@ -162,3 +162,52 @@
 .tsu-promo a { font-weight: 850; text-decoration: underline; }
 .tsu-sponsor { margin: 1.25rem 0; border: 2px solid var(--ink); padding: .75rem 1rem; background: #fff; }
 .tsu-sponsor p { margin: 0 0 .25rem; font-size: .9rem; }
+
+.shop-menu { position: relative; }
+.shop-menu summary {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.shop-menu summary::-webkit-details-marker { display: none; }
+.shop-menu summary::after {
+  content: "";
+  width: .4em;
+  height: .4em;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  rotate: 45deg;
+  translate: 0 -.12em;
+}
+.shop-menu[open] summary { text-decoration: underline; text-underline-offset: .2em; }
+.shop-menu summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
+.shop-menu ul, .catalog-nav ul { margin: 0; padding: 0; list-style: none; }
+.shop-menu ul {
+  position: absolute;
+  z-index: 3;
+  top: 100%;
+  left: 0;
+  width: max-content;
+  max-width: 60vw;
+  border: 2px solid var(--ink);
+  background: #fff;
+  box-shadow: 4px 4px var(--ink);
+}
+.shop-menu ul a { display: flex; padding: .35rem .7rem; }
+.shop-menu ul a:hover, .catalog-nav a:hover { background: var(--pink); }
+.shop-menu a[aria-current], .catalog-nav a[aria-current] { background: var(--yellow); }
+.catalog-nav { margin: 0 0 1.5rem; }
+.catalog-nav ul { display: flex; flex-wrap: wrap; gap: .55rem; }
+.catalog-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .35rem .65rem;
+  border: 2px solid var(--ink);
+  background: #fff;
+  font-weight: 800;
+}
+.breadcrumbs { overflow-wrap: anywhere; }

@@ -4,7 +4,7 @@
 <nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button><button data-tab="customers">Clients et newsletter</button><button data-tab="journal">Journal</button></nav>
 <section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
-<label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="acc">Accessoire</option></select></label>
+<label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="sweat">Pull ou sweat</option><option value="acc">Accessoire</option></select></label>
 <label>Prix en euros <input name="price" type="number" min="0.50" max="9999" step="0.01" required></label><label>URL HTTPS de la photo <input name="image" type="url" maxlength="2048"></label>
 <label>Description française <textarea name="fr" maxlength="1500"></textarea></label><label>Description anglaise <textarea name="en" maxlength="1500"></textarea></label>
 <label>Matière et composition <input name="material" maxlength="250"></label>

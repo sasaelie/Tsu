@@ -211,3 +211,46 @@
   font-weight: 800;
 }
 .breadcrumbs { overflow-wrap: anywhere; }
+
+/* Keep the department picker in the page flow on phones. */
+.shop-menu ul { min-width: 12rem; }
+@media (max-width: 750px) {
+  .site-header nav { position: relative; }
+  .site-header nav:has(.shop-menu[open]) { padding-bottom: 3.8rem; }
+  .site-header nav:has(.shop-menu li:nth-child(3)):has(.shop-menu[open]) { padding-bottom: 6.55rem; }
+  .shop-menu { position: static; }
+  .shop-menu ul {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    inset: auto 0 .65rem;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    box-shadow: 3px 3px var(--ink);
+  }
+}
+
+.journal-topics { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1rem 0 1.5rem; }
+.journal-topics a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: .4rem .65rem;
+  font-weight: 800;
+  border: 2px solid var(--ink);
+  background: #fff;
+  text-decoration: none;
+}
+.journal-topics a:hover { background: var(--yellow); }
+.journal-figure { margin: 1rem 0 1.5rem; }
+.journal-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 2px solid var(--ink);
+}
+.journal-figure figcaption { margin-top: .5rem; }
+.editorial .journal-grid { margin-block: .85rem 1.4rem; }
+.editorial .journal-grid h3 { margin: 0 0 .35rem; font-size: 1.18rem; }
+.editorial .journal-grid li p { margin: .2rem 0; }
+.journal-related { margin-block: 1.5rem; }

@@ -276,12 +276,16 @@ async function renderStorefront(request,env) {
   const canonical = origin+languagePath(path,en);
   const defaults = {
     home:local(en,'TSŪ, le vestiaire otaku. T-shirts et accessoires inspirés du manga, fabriqués à la demande.','TSŪ, the otaku wardrobe. Manga-inspired T-shirts and accessories, made to order.'),
+    edition:edition ? local(en,'Mangas VF et anime de la semaine du ','French manga and anime releases for the week of ')+mangaDate(edition.week,en)+local(en,' avec les dates et leurs sources.',' with dates and source links.') : '',
     catalog:local(en,'Explore le vestiaire otaku TSŪ. Retrouve tous les modèles disponibles et les rayons de la boutique.','Explore the TSŪ otaku wardrobe. Browse available designs and shop departments.'),
     ...Object.fromEntries(catalogTypes.map(type=>[type,local(en,catalogDepartments[type].descFr,catalogDepartments[type].descEn)])),
     product:product ? product.name+' · '+typeName(product.type,en)+' · '+local(en,'Fabrication à la demande. Consulte les variantes, le prix et la livraison sur TSŪ.','Made to order. See options, pricing and delivery at TSŪ.') : ''
   };
   const description = text((managedArticle && (local(en,managedArticle.seoFr,managedArticle.seoEn) || local(en,managedArticle.bodyFr,managedArticle.bodyEn))) || local(en,route.descFr,route.descEn) || product?.[en?'en':'fr'] || product?.[en?'fr':'en'] || defaults[page] ||
     heading+' · '+local(en,'Informations de la boutique TSŪ.','TSŪ store information.'),155);
+  const journalImage = page==='article' ? staticArticleImage(route.article) :
+    ['blog','edition'].includes(page) ? journalImages.watch : null;
+  const imageUrl=safePhoto(product?.image) || origin+(journalImage?.path ?? '/room.webp');
   const schema = product ? {
     '@context':'https://schema.org','@type':'Product',name:product.name,
     ...(safePhoto(product.image) ? {image:safePhoto(product.image)} : {}),
@@ -289,19 +293,30 @@ async function renderStorefront(request,env) {
     ...(product.material ? {material:product.material} : {}),
     category:typeName(product.type,en),sku:product.id,url:canonical
   } : ['article','edition','managed-article'].includes(page) ? {'@context':'https://schema.org','@type':'BlogPosting',headline:heading,description,url:canonical,
-    datePublished:(managedArticle ?? edition)?.publishedAt.slice(0,10) ?? '2026-11-23',inLanguage:en?'en':'fr',author:{'@type':'Organization',name:'TSŪ',url:origin+languagePath('/a-propos',en)}} :
+    datePublished:(managedArticle ?? edition)?.publishedAt.slice(0,10) ?? '2026-11-23',
+    ...(page==='article' ? {dateModified:editorialRevision} : {}),
+    ...(journalImage ? {image:[imageUrl]} : {}),
+    mainEntityOfPage:canonical,inLanguage:en?'en':'fr',
+    author:{'@type':'Organization',name:local(en,'La rédaction TSŪ','TSŪ editorial team'),url:origin+languagePath('/a-propos',en)}} :
     page==='home' ? {'@context':'https://schema.org','@type':'WebSite',name:'TSŪ',url:canonical,inLanguage:en?'en':'fr'} : null;
+  const journalCrumbs = ['article','managed-article','edition','archive'].includes(page);
+  const breadcrumbsSchema = journalCrumbs ? {'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[
+    {'@type':'ListItem',position:1,name:local(en,'Journal manga et anime','Manga and anime journal'),item:origin+languagePath('/blog',en)},
+    {'@type':'ListItem',position:2,name:heading,item:canonical}
+  ]} : null;
   const title = heading+' | TSŪ';
   const meta = '<title>'+htmlEscape(title)+'</title><meta name="description" content="'+htmlEscape(description)+'">'+
     ((!indexable || page==='missing') ? '<meta name="robots" content="noindex, nofollow">' : '')+
     (page==='missing' ? '' : '<link rel="canonical" href="'+htmlEscape(canonical)+'"><link rel="alternate" hreflang="fr" href="'+htmlEscape(origin+path)+'">'+(managedArticle && (!managedArticle.titleEn || !managedArticle.bodyEn) ? '' : '<link rel="alternate" hreflang="en" href="'+htmlEscape(origin+languagePath(path,true))+'">'))+
     '<meta property="og:title" content="'+htmlEscape(title)+'"><meta property="og:description" content="'+htmlEscape(description)+'"><meta property="og:url" content="'+htmlEscape(canonical)+'">'+
-    '<meta property="og:image" content="'+htmlEscape(safePhoto(product?.image) || origin+'/room.webp')+'">'+
-    (schema ? '<script type="application/ld+json">'+jsonScript(schema)+'</script>' : '');
+    '<meta property="og:image" content="'+htmlEscape(imageUrl)+'">'+
+    [schema,breadcrumbsSchema].filter(Boolean).map(data=>'<script type="application/ld+json">'+jsonScript(data)+'</script>').join('');
+  const journalTrail=journalCrumbs ? '<nav class="breadcrumbs" aria-label="'+local(en,'Fil d’Ariane','Breadcrumbs')+'">'+
+    navLink('/blog',en,'Journal','Journal')+'<span aria-hidden="true">›</span><span aria-current="page">'+htmlEscape(heading)+'</span></nav>' : '';
   let main;
   if (page==='home') main = homeContent(published,settings,en,member)+(!checkoutReturn ? editorialPromo(en) : '');
   else if (page==='product') main = productContent(product,settings,en);
-  else if (page==='managed-article') main = '<article class="shop-section info-page editorial"><h1>'+htmlEscape(heading)+'</h1><div class="preserve-lines">'+
+  else if (page==='managed-article') main = '<article class="shop-section info-page editorial">'+journalTrail+'<h1>'+htmlEscape(heading)+'</h1><div class="preserve-lines">'+
     htmlEscape(local(en,managedArticle.bodyFr,managedArticle.bodyEn))+'</div><p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p></article>';
   else if (['about','faq','blog','article','archive','edition'].includes(page)) {
     const editions=['blog','archive'].includes(page) ? await listEditions(env,true) : [];
@@ -312,7 +327,7 @@ async function renderStorefront(request,env) {
       page==='blog' ? articleList+journalEditorial(en,editions)+editorialSponsor(env,en) :
         page==='archive' ? articleList+editionList(editions,en)+'<p>'+navLink('/blog/5-mangas-novembre-2026',en,'Sélection de novembre 2026','November 2026 selection')+'</p>' :
         page==='edition' ? editionEditorial(edition,en) : articleEditorial(route.article,en);
-    main = '<'+(page==='blog'?'section':'article')+' class="shop-section info-page editorial"><h1>'+htmlEscape(heading)+'</h1>'+
+    main = '<'+(page==='blog'?'section':'article')+' class="shop-section info-page editorial">'+journalTrail+'<h1>'+htmlEscape(heading)+'</h1>'+
       content+'</'+(page==='blog'?'section':'article')+'>';
   }
   else if (page==='catalog' || catalogTypes.includes(page)) {

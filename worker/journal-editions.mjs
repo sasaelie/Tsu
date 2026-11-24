@@ -61,16 +61,17 @@ const editionList=(editions,en)=>'<ul class="release-list">'+editions.map(d=>'<l
 
 function editionEditorial(edition,en) {
   const sections=['manga','anime'].map(kind=>{
-    const label=kind==='manga'?local(en,'Mangas à lire','Manga to read'):local(en,'Anime à regarder','Anime to watch');
+    const label=kind==='manga'?local(en,'Parutions manga francophones','French-language manga releases'):local(en,'Diffusions anime repérées','Listed anime broadcasts');
     const items=edition.items.filter(item=>item.kind===kind).sort((a,b)=>a.date.localeCompare(b.date));
     if (!items.length) return '';
     return '<section><h2>'+label+'</h2><ul class="release-list">'+items.map(item=>'<li><time datetime="'+item.date+'">'+mangaDate(item.date,en)+'</time> · <strong>'+
       htmlEscape(item.title)+'</strong><p>'+htmlEscape(local(en,item.noteFr,item.noteEn) || item.noteFr || item.noteEn)+
-      '</p>'+externalEditorialLink(local(en,'Vérifier la source','Check the source'),item.source)+'</li>').join('')+'</ul></section>';
+      '</p>'+externalEditorialLink(local(en,'Source de la date · ','Release source · ')+new URL(item.source).hostname.replace(/^www[.]/,''),item.source)+'</li>').join('')+'</ul></section>';
   }).join('');
   const intro=local(en,edition.introFr,edition.introEn) || edition.introFr || edition.introEn;
   return '<p class="article-meta">'+navLink('/blog/archives',en,'Archives du journal','Journal archive')+'</p>'+
-    (intro?'<p class="editorial-lead">'+htmlEscape(intro)+'</p>':'')+sections+
+    (intro?'<p class="editorial-lead">'+htmlEscape(intro)+'</p>':'')+journalFigure(journalImages.watch,en,true)+sections+
+    '<p>'+externalEditorialLink(local(en,'Vérifier les simulcasts sur Crunchyroll','Check simulcasts on Crunchyroll'),'https://www.crunchyroll.com/fr/simulcasts')+'</p>'+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';
 }
 

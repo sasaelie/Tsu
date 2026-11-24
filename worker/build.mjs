@@ -11,6 +11,8 @@ const assets = Object.fromEntries([
   ['/shop.js', 'dist/shop.js', 'text/javascript; charset=utf-8'],
   ['/cart.js', 'dist/cart.js', 'text/javascript; charset=utf-8'],
   ['/room.webp', 'dist/room.webp', 'image/webp'],
+  ['/journal-manga-anime.webp', 'dist/journal-manga-anime.webp', 'image/webp'],
+  ['/journal-vestiaire-otaku.webp', 'dist/journal-vestiaire-otaku.webp', 'image/webp'],
   ['/compte', 'account/index.html', 'text/html; charset=utf-8'],
   ['/compte/index.js', 'account/index.js', 'text/javascript; charset=utf-8'],
   ['/espace-client', 'customer/index.html', 'text/html; charset=utf-8'],

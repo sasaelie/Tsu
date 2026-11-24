@@ -5,9 +5,9 @@ const editorialPages = {
   '/faq':{enPath:'/en/faq',page:'faq',fr:'Questions fréquentes',en:'Frequently asked questions',
     descFr:'Fabrication Printful, livraison en Belgique et en France, suivi, tailles, défauts et retours chez TSŪ.',
     descEn:'Printful production, shipping to Belgium and France, tracking, sizing, faults and returns at TSŪ.'},
-  '/blog':{enPath:'/en/blog',page:'blog',fr:'Le journal TSŪ',en:'The TSŪ journal',
-    descFr:'Style otaku, streetwear manga, conventions et recommandations de lecture sans spoilers.',
-    descEn:'Otaku style, manga streetwear, conventions and spoiler-free reading recommendations.'},
+  '/blog':{enPath:'/en/blog',page:'blog',fr:'Journal manga et anime',en:'Manga and anime journal',
+    descFr:'Sorties manga en français, calendriers anime, recommandations sans spoilers et guides streetwear otaku pour les lecteurs en Belgique et en France.',
+    descEn:'French-language manga releases, anime schedules, spoiler-free recommendations and otaku streetwear guides for readers in Belgium and France.'},
   '/blog/archives':{enPath:'/en/blog/archive',page:'archive',fr:'Archives du journal',en:'Journal archive',
     descFr:'Toutes les éditions manga et anime du journal TSŪ.',descEn:'All manga and anime editions from the TSŪ journal.'}
 };
@@ -30,7 +30,8 @@ const mangaSelection = [
     en:'For action. Chihiro, a swordsmith’s son, inherits a world where enchanted blades are coveted weapons. Start at volume one for clear fights, taut pacing and a hero whose silences matter.'},
   {title:'L’Atelier des Sorciers',author:'Kamome Shirahama',publisher:'Pika',release:'2026-11-12',editionFr:'tome 16 collector',editionEn:'volume 16 collector’s edition',
     source:'https://www.pika.fr/livre/latelier-des-sorciers-t16-collector-9791043311772/',
-    stream:'https://www.crunchyroll.com/fr/series/GT00258001/witch-hat-atelier',streamTitle:'Crunchyroll',
+    stream:'https://www.crunchyroll.com/series/GT00258001/witch-hat-atelier',streamTitle:'Crunchyroll',
+    availability:'https://www.justwatch.com/be/serie/latelier-des-sorciers',
     fr:'Pour la magie et le dessin. Coco découvre que la magie se trace. Tourne quelques pages du tome 1 et observe les cadres, les tissus et les cercles magiques. Le monde s’apprend par les yeux autant que par l’histoire.',
     en:'For magic and artwork. Coco discovers that magic can be drawn. Open volume one and pay attention to the frames, fabrics and spell circles. You learn the world through its artwork as much as its story.'},
   {title:'SPY × FAMILY',author:'Tatsuya Endo',publisher:'Kurokawa',release:'2026-11-12',editionFr:'tome 17 collector',editionEn:'volume 17 collector’s edition',
@@ -40,7 +41,8 @@ const mangaSelection = [
     en:'For unwinding after a long day. A spy puts together a cover family, and everyone has their own secret. Volume one is a good pick if you want laughs with some action.'},
   {title:'Les Carnets de l’apothicaire',author:'Natsu Hyūga, Itsuki Nanao et Nekokurage',publisher:'Ki-oon',release:'2026-11-19',editionFr:'tome 17',editionEn:'volume 17',
     source:'https://ki-oon.com/9791032723531-les-carnets-de-l-apothicaire-edition-simple-volume-17',
-    stream:'https://www.crunchyroll.com/series/G3KHEVDJ7/the-apothecary-diaries',streamTitle:'Crunchyroll',
+    stream:'https://www.crunchyroll.com/fr/series/G3KHEVDJ7/the-apothecary-diaries',streamTitle:'Crunchyroll',
+    availability:'https://www.justwatch.com/be/serie/les-carnets-de-lapothicaire',
     fr:'Pour l’enquête. Mao Mao, une apothicaire de palais, remarque ce que les autres laissent passer. Prends le tome 1 de l’édition Ki-oon si tu aimes remonter la piste à partir d’un symptôme, d’un détail ou d’une contradiction.',
     en:'For a mystery. Palace apothecary Maomao notices what other people miss. Pick up volume one of this edition if you like following clues through symptoms, details and contradictions.'},
   {title:'Alice in Borderland',author:'Haro Asō',publisher:'Delcourt',release:'2026-11-19',editionFr:'tome 2 Perfect Edition',editionEn:'volume 2, Perfect Edition',
@@ -52,7 +54,7 @@ const mangaSelection = [
 
 const upcomingManga = [
   {title:'Shimazaki in the Land of Peace',publisher:'Pika',release:'2026-12-02',editionFr:'tome 6',editionEn:'volume 6',
-    source:'https://www.pika.fr/planning-sorties/2026-12/'}
+    source:'https://www.pika.fr/livre/shimazaki-land-peace-t06-9791043308697/'}
 ];
 
 const journal = [
@@ -69,7 +71,7 @@ const journal = [
         'De loin, regarde si les couleurs et la coupe font une tenue que tu porterais un mardi. De près, demande-toi si le détail ferait sourire quelqu’un qui connaît la référence. Un tee écru, un pantalon sombre et un accent rouge donnent déjà une direction.',
         'From a distance, see whether the colours and fit make an outfit you would wear on a Tuesday. Up close, ask whether the detail would make someone who knows the reference smile. An off-white tee, dark trousers and one red accent give you a direction.']
     ],
-    sources:[['Discussion r/AnimeMerchandise','https://www.reddit.com/r/AnimeMerchandise/comments/1u7hhab/where_do_you_get_lowkey_anime_themed_graphic_tees/']]
+    sources:[['UNIQLO Belgique · Collections UT', 'https://www.uniqlo.com/be/fr/special-feature/ut/lineup']]
   },
   {
     slug:'pull-manga-streetwear',enSlug:'anime-hoodie-streetwear',
@@ -81,7 +83,8 @@ const journal = [
       ['Le look convention','The convention look','Associe un hoodie de poids moyen à un cargo et des chaussures déjà rodées. Choisis une poche fermée pour ton téléphone et un t-shirt léger dessous si la salle chauffe.','Pair a midweight hoodie with cargos and broken-in shoes. Pick a secure pocket for your phone and wear a light tee underneath if the hall gets warm.'],
       ['Le look du soir','The evening look','Sous une veste de travail, laisse dépasser une seule couleur ou un morceau du motif. Essaie la superposition devant un miroir en bougeant les bras. Tu sauras vite si le pull gêne sous les manches.','Under a work jacket, let one colour or a sliver of the graphic show. Try the layers in a mirror and move your arms. You will quickly know if the sleeves bunch up.']
     ],
-    sources:[['Discussion r/AnimeMerchandise','https://www.reddit.com/r/AnimeMerchandise/comments/1ira81b']]
+    sources:[['UNIQLO Belgique · Collections UT','https://www.uniqlo.com/be/fr/special-feature/ut/lineup'],
+      ['Made in Asia Bruxelles · Règlement','https://www.madeinasia.be/fr/reglement/']]
   },
   {
     slug:'cosplay-casual-garcon',enSlug:'casual-anime-cosplay',
@@ -93,8 +96,7 @@ const journal = [
       ['Le rival en civil','The rival off duty','Pars sur un t-shirt noir, une surchemise claire et un accessoire dans la couleur du personnage. Prends des chaussures confortables et vérifie le règlement de la convention avant de prévoir un accessoire de scène.','Start with a black tee, a light overshirt and an accessory in the character’s colour. Wear comfortable shoes and check the convention’s prop rules before planning any stage accessories.'],
       ['Le sportif en jour de repos','The athlete on a rest day','Un short long, une veste de sport et une paire de chaussettes assortie à l’équipe. Si tu veux une photo qui parle aux fans, pense à un geste ou à une pose propre au personnage.','Try long shorts, a track jacket and socks that match the team colours. For a photo that fans will recognise, choose a character-specific pose or gesture.']
     ],
-    sources:[['Discussion r/CosplayHelp','https://www.reddit.com/r/CosplayHelp/comments/1j3vag8/what_are_your_views_on_casual_cosplay/'],
-      ['Discussion r/animecons','https://www.reddit.com/r/animecons/comments/1g5yevt']]
+    sources:[['Made in Asia Bruxelles · Règlement pour les visiteurs et les cosplayers','https://www.madeinasia.be/fr/reglement/']]
   },
   {
     slug:'taille-t-shirt-oversize',enSlug:'oversized-t-shirt-sizing',
@@ -105,7 +107,7 @@ const journal = [
       ['Prends ton t-shirt préféré','Grab your favourite T-shirt','Pose-le à plat. Mesure la largeur d’aisselle à aisselle, puis la longueur du haut de l’épaule vers le bas. Compare avec les mesures du vêtement de la fiche. Si le tableau indique un tour de poitrine, lis d’abord s’il parle du corps ou du vêtement.','Lay it flat. Measure armpit to armpit, then from the top of the shoulder to the hem. Compare those numbers with the garment measurements on the product page. If a chart lists chest circumference, first check whether it refers to the body or the garment.'],
       ['Regarde les épaules et la longueur séparément','Check shoulders and length separately','Une coupe oversize pensée pour ça peut avoir des épaules tombantes et plus de largeur. Prendre simplement une taille au-dessus peut surtout allonger le t-shirt. Compare les mesures selon le tombé que tu veux.','A deliberate oversized cut can have dropped shoulders and extra width. Going up one size may mostly make the shirt longer. Compare the measurements based on the silhouette you want.']
     ],
-    sources:[['Discussion r/Hypland','https://www.reddit.com/r/Hypland/comments/z7dsob']]
+    sources:[['Printful · Exemple de tableau de mesures d’un vêtement','https://www.printful.com/custom-products/size-guide?productId=880']]
   },
   {
     slug:'entretien-t-shirt-imprime-brode',enSlug:'printed-and-embroidered-shirt-care',
@@ -116,7 +118,7 @@ const journal = [
       ['Pour un motif imprimé','For a printed design','Lis l’étiquette et la fiche du produit. Pour beaucoup de vêtements imprimés, Printful recommande le lavage à froid sur l’envers et un cycle doux. Évite de poser le fer directement sur le motif. Quand le produit le permet, sèche-le à l’air libre.','Read the label and product notes. For many printed garments, Printful recommends cold washing inside out on a gentle cycle. Keep the iron off the print. Air dry when the garment instructions allow it.'],
       ['Pour une broderie ou une casquette','For embroidery or a cap','Consulte les consignes propres à la pièce. Une casquette et un sweat brodé ne s’entretiennent pas forcément de la même façon. Si un fil dépasse, évite de tirer dessus. En cas de défaut à la réception, garde la référence et prends une photo avant de laver la pièce.','Look for the instructions for the exact item. A cap and an embroidered sweatshirt may require different care. If a thread sticks out, avoid pulling it. If you notice a fault on arrival, keep the order reference and take a photo before washing.']
     ],
-    sources:[['Guide d’entretien Printful',editorialLinks.care],['Discussion sur l’entretien des sweats','https://www.reddit.com/r/VShojo/comments/znul23']]
+    sources:[['Printful · Entretien des articles imprimés et brodés',editorialLinks.care]]
   },
   {
     slug:'5-mangas-novembre-2026',enSlug:'five-manga-november-2026',
@@ -157,7 +159,7 @@ function editorialEnglishPath(path) {
 }
 
 function externalEditorialLink(label,path) {
-  return '<a href="'+htmlEscape(path)+'">'+htmlEscape(label)+'</a>';
+  return '<a href="'+htmlEscape(path)+'" target="_blank" rel="noopener">'+htmlEscape(label)+'</a>';
 }
 function editorialSources(items,en) {
   return '<ul class="editorial-sources" aria-label="'+local(en,'Sources','Sources')+'">'+items.map(([label,path])=>
@@ -218,26 +220,68 @@ function faqEditorial(en) {
 function mangaDate(value,en) {
   return new Intl.DateTimeFormat(en?'en-IE':'fr-BE',{day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(value));
 }
+const journalImages = {
+  watch: {path:'/journal-manga-anime.webp',fr:'Un manga ouvert, un calendrier et un écran de télévision illustrés dans le style TSŪ.',
+    en:'An open manga, a calendar and a television illustrated in the TSŪ style.'},
+  wardrobe: {path:'/journal-vestiaire-otaku.webp',fr:'Trois silhouettes streetwear avec un t-shirt clair, un sweat bleu et une surchemise.',
+    en:'Three streetwear outfits with a light T-shirt, a blue hoodie and an overshirt.'}
+};
+const referenceCalendars = [
+  ['Kana · Planning manga','https://www.kana.fr/planning/'],
+  ['Pika Édition · Planning manga','https://www.pika.fr/planning-sorties/'],
+  ['Glénat Manga · Planning','https://www.glenat.com/manga/planning-des-sorties/'],
+  ['Manga-news · Sorties francophones','https://www.manga-news.com/index.php/planning'],
+  ['Crunchyroll · Simulcasts','https://www.crunchyroll.com/fr/simulcasts']
+];
+const practicalJournal = new Set(['taille-t-shirt-oversize','entretien-t-shirt-imprime-brode']);
+const staticArticleImage=article=>article.selection ? journalImages.watch : journalImages.wardrobe;
+const editorialRevision='2026-11-24';
+
+function journalFigure(image,en,priority=false) {
+  return '<figure class="journal-figure"><img src="'+image.path+'" width="1200" height="800" alt="'+
+    htmlEscape(local(en,image.fr,image.en))+'" decoding="async" '+(priority?'fetchpriority="high"':'loading="lazy"')+'>'+
+    '<figcaption>'+local(en,'Illustration originale TSŪ','Original TSŪ illustration')+'</figcaption></figure>';
+}
+function journalCard(item,en) {
+  return '<li><h3>'+navLink('/blog/'+item.slug,en,item.fr,item.en)+'</h3><p>'+
+    htmlEscape(local(en,item.descFr,item.descEn))+'</p></li>';
+}
 function journalEditorial(en,editions) {
-  const featured = journal.find(item=>item.selection);
-  const cards = [featured,...journal.filter(item=>item!==featured)].map(item=>
-    '<li><h2>'+navLink('/blog/'+item.slug,en,item.fr,item.en)+'</h2><p>'+htmlEscape(local(en,item.descFr,item.descEn))+'</p></li>'
-  ).join('');
-  const schedule = [...upcomingManga,...mangaSelection].sort((a,b)=>b.release.localeCompare(a.release));
-  return '<p class="editorial-lead">'+local(en,'Du vestiaire à la bibliothèque. Des idées de tenues, des guides et des lectures sans spoilers.','From wardrobe to bookshelf. Outfit ideas, guides and spoiler-free reading picks.')+'</p>'+
-    '<section><h2>'+local(en,'La veille manga et anime','Manga and anime watch')+'</h2>'+
-    (editions.length?editionList(editions.slice(0,3),en):'<p>'+local(en,'Retrouve les sorties vérifiées dans le calendrier ci-dessous.','Find verified releases in the calendar below.')+'</p>')+
-    '<p>'+navLink('/blog/archives',en,'Toutes les éditions','All editions')+'</p></section>'+
-    '<ul class="journal-grid">'+cards+'</ul><section id="sorties-manga"><h2>'+local(en,'Sorties manga à suivre','Manga releases to follow')+'</h2><p>'+
-    local(en,'Repères vérifiés le 23 novembre 2026 pour les éditions francophones. Une date de parution peut bouger et la disponibilité en librairie en Belgique varie.',
-      'Checked 23 November 2026 for French-language editions. Release dates can change and bookseller availability in Belgium varies.')+'</p><ul class="release-list">'+
+  const featured=journal.find(item=>item.selection);
+  const style=journal.filter(item=>!item.selection&&!practicalJournal.has(item.slug));
+  const guides=journal.filter(item=>practicalJournal.has(item.slug));
+  const schedule=[...upcomingManga,...mangaSelection].sort((a,b)=>b.release.localeCompare(a.release));
+  return '<p class="editorial-lead">'+local(en,'Qu’est-ce qui sort cette semaine ? Par quel manga commencer ? Le Journal TSŪ rassemble des dates sourcées, des conseils sans spoilers et des idées de tenues.',
+    'What comes out this week? Which manga should you start with? The TSŪ journal brings together sourced dates, spoiler-free picks and outfit ideas.')+'</p>'+
+    '<nav class="journal-topics" aria-label="'+local(en,'Rubriques du journal','Journal topics')+'">'+
+    '<a href="#sorties-manga">'+local(en,'Sorties manga et anime','Manga and anime releases')+'</a>'+
+    '<a href="#style-otaku">'+local(en,'Style et cosplay','Style and cosplay')+'</a>'+
+    '<a href="#guides-vetements">'+local(en,'Tailles et entretien','Sizing and care')+'</a></nav>'+
+    journalFigure(journalImages.watch,en,true)+
+    '<section id="sorties-manga"><h2>'+local(en,'Sorties manga VF et agenda anime','French manga releases and anime schedule')+'</h2>'+
+    (editions.length?editionList(editions.slice(0,3),en):'<p>'+local(en,'Retrouve ci-dessous les dernières dates relevées et les calendriers à consulter.','Find the latest dates we checked and the calendars to follow below.')+'</p>')+
+    '<p>'+navLink('/blog/archives',en,'Consulter les archives de la veille','Browse release archives')+'</p>'+
+    '<ul class="journal-grid">'+journalCard(featured,en)+'</ul>'+
+    '<h3>'+local(en,'Dates relevées en novembre et décembre 2026','Release dates checked for November and December 2026')+'</h3><p>'+
+    local(en,'Vérifiées le 24 novembre 2026 auprès des éditeurs et des fiches de parution. Pour la Belgique, vérifie aussi la disponibilité chez ton libraire.',
+      'Checked on 24 November 2026 against publisher and release listings. For Belgium, confirm availability with your bookseller.')+'</p><ul class="release-list">'+
     schedule.map(book=>'<li><time datetime="'+book.release+'">'+mangaDate(book.release,en)+'</time> · '+
-      externalEditorialLink(book.title+' — '+local(en,book.editionFr,book.editionEn),book.source)+' · '+htmlEscape(book.publisher)+'</li>').join('')+
-    '</ul><p>'+local(en,'À l’écran, l’anime Kagurabachi est annoncé pour avril 2027.','On screen, the Kagurabachi anime is announced for April 2027.')+' '+
-    externalEditorialLink(local(en,'Annonce officielle','Official announcement'),'https://anime.kagurabachi.jp/en/news/official-site-open/')+
-    '</p><p>'+local(en,'Calendriers éditeurs','Publisher calendars')+' · '+
-    externalEditorialLink('Kana','https://www.kana.fr/planning/')+' · '+externalEditorialLink('Pika','https://www.pika.fr/planning-sorties/')+' · '+
-    externalEditorialLink('Glénat','https://www.glenat.com/manga/planning-des-sorties/')+'</p></section>';
+      externalEditorialLink(book.title+' — '+local(en,book.editionFr,book.editionEn)+' ('+book.publisher+')',book.source)+'</li>').join('')+
+    '</ul><p>'+local(en,'Kagurabachi est annoncé en anime pour avril 2027.','Kagurabachi is scheduled for an anime release in April 2027.')+' '+
+    externalEditorialLink(local(en,'Annonce officielle de l’anime Kagurabachi','Official Kagurabachi anime announcement'),'https://anime.kagurabachi.jp/en/news/official-site-open/')+
+    '</p><h3>'+local(en,'Calendriers à consulter','Calendars to follow')+'</h3>'+editorialSources(referenceCalendars,en)+'</section>'+
+    '<section id="style-otaku"><h2>'+local(en,'Style otaku et cosplay casual','Otaku style and casual cosplay')+'</h2>'+
+    journalFigure(journalImages.wardrobe,en)+'<ul class="journal-grid">'+style.map(item=>journalCard(item,en)).join('')+'</ul></section>'+
+    '<section id="guides-vetements"><h2>'+local(en,'Guides tailles et entretien','Sizing and care guides')+'</h2>'+
+    '<ul class="journal-grid">'+guides.map(item=>journalCard(item,en)).join('')+'</ul></section>';
+}
+
+function articleRelated(article,en) {
+  const links=journal.filter(item=>item!==article && Boolean(item.selection)===Boolean(article.selection) &&
+    practicalJournal.has(item.slug)===practicalJournal.has(article.slug)).slice(0,2);
+  return '<aside class="journal-related"><h2>'+local(en,'À lire aussi','Related reading')+'</h2><ul class="release-list">'+
+    links.map(item=>'<li>'+navLink('/blog/'+item.slug,en,item.fr,item.en)+'</li>').join('')+
+    '<li>'+navLink('/blog',en,'Parcourir le Journal manga et anime','Browse the manga and anime journal')+'</li></ul></aside>';
 }
 
 function articleEditorial(article,en) {
@@ -245,13 +289,16 @@ function articleEditorial(article,en) {
     'Five editorial picks, zero spoilers. Each has a French-language release this month. Start with volume one even if the new release is a later volume.') : local(en,article.descFr,article.descEn);
   const body = article.selection ? mangaSelection.map(book=>
     '<section><h2>'+htmlEscape(book.title)+'</h2><p class="article-meta">'+htmlEscape(book.author)+' · '+htmlEscape(book.publisher)+'</p><p>'+htmlEscape(local(en,book.fr,book.en))+'</p><p>'+
-    externalEditorialLink(mangaDate(book.release,en)+' · '+local(en,book.editionFr,book.editionEn),book.source)+
-    (book.stream?' · '+externalEditorialLink(local(en,'À regarder sur ','Watch on ')+book.streamTitle,book.stream):'')+'</p></section>').join('')+
+    externalEditorialLink(local(en,'Fiche du ','Listing for ')+local(en,book.editionFr,book.editionEn)+' · '+mangaDate(book.release,en),book.source)+
+    (book.stream?' · '+externalEditorialLink(local(en,'Fiche sur ','Listing on ')+book.streamTitle,book.stream):'')+
+    (book.availability?' · '+externalEditorialLink(local(en,'Disponibilité en Belgique · JustWatch','Availability in Belgium · JustWatch'),book.availability):'')+'</p></section>').join('')+
     '<p>'+local(en,'Les liens de streaming indiquent les pages officielles. Le catalogue peut varier selon le pays.','Streaming links lead to official pages. Catalogues may vary by country.')+'</p>' :
     article.sections.map(([frTitle,enTitle,frBody,enBody])=>'<section><h2>'+htmlEscape(local(en,frTitle,enTitle))+'</h2><p>'+htmlEscape(local(en,frBody,enBody))+'</p></section>').join('')+
-    editorialSources(article.sources,en);
+    '<h2>'+local(en,'Sources et repères','Sources and references')+'</h2>'+editorialSources(article.sources,en);
   return '<p class="article-meta">'+navLink('/blog',en,'Le journal TSŪ','The TSŪ journal')+' · <time datetime="2026-11-23">'+
-    local(en,'23 novembre 2026','23 November 2026')+'</time></p><p class="editorial-lead">'+htmlEscape(intro)+'</p>'+body+
+    local(en,'23 novembre 2026','23 November 2026')+'</time> · '+local(en,'La rédaction TSŪ','TSŪ editorial team')+
+    '</p><p class="editorial-lead">'+htmlEscape(intro)+'</p>'+
+    journalFigure(staticArticleImage(article),en,true)+body+articleRelated(article,en)+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';
 }
 

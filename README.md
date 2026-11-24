@@ -53,3 +53,15 @@ Abonner la destination à `checkout.session.completed`, `checkout.session.async_
 - Mettre en place la rétractation en ligne et son accusé de réception sur support durable selon le marché.
 - Tester en réel dans un environnement prévu à cet effet le paiement Stripe, ses événements signés, la confirmation de commande, la réconciliation, les remboursements et l’exécution Printful.
 - Vérifier les réponses sur le domaine définitif, le plan du site, l’accès aux robots de recherche et les données structurées d’offre après l’ouverture des ventes.
+
+## Référencement du Journal TSŪ
+
+Le Journal regroupe trois familles de recherches en français et en anglais. Les traductions ont leur URL et leurs balises de langue.
+
+| Intention | Page à faire grandir | Vérification avant publication |
+| --- | --- | --- |
+| Sorties manga VF et agenda anime | Journal, veille datée et archives | Relier chaque date à une fiche d’éditeur, un calendrier ou un diffuseur. Indiquer le marché lorsque la date de diffusion concerne le Japon. |
+| Choisir une lecture ou une série | Sélections sans spoilers | Donner une raison de choisir le titre, indiquer par quel tome commencer et vérifier la disponibilité en Belgique séparément. |
+| Tenues otaku, taille et entretien | Guides reliés entre eux | Ajouter un exemple concret, une illustration pertinente et, selon le sujet, un lien vers les consignes officielles ou vers le rayon correspondant. |
+
+Le site reste en accès privé et en `noindex` pendant la préparation. Au lancement public, activer l’indexation, soumettre `/sitemap.xml` à Search Console, vérifier l’URL du Journal et ses traductions, puis suivre les pages indexées, les impressions et les clics par groupe de pages. Mettre à jour les guides quand une source ou un exemple change. Conserver les URL existantes et vérifier les destinations après chaque mise à jour.

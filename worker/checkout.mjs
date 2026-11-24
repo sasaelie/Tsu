@@ -7,7 +7,7 @@ async function checkoutItems(env, config, customer, country, lines) {
     const variant = product?.variants.find(item => item.id === line.variantId);
     if (!variant?.syncId || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 20) fail('Un article du panier est indisponible.');
     const label = [variant.size,variant.color].filter(Boolean).join(' · ') || variant.label;
-    return { path:productPath(product), name:[product.name,label].filter(Boolean).join(' · '), price:product.price,
+    return { productId:product.id, path:productPath(product), name:[product.name,label].filter(Boolean).join(' · '), price:product.price,
       syncId:variant.syncId, catalogId:variant.catalogId, quantity:line.quantity };
   });
 }
@@ -65,7 +65,7 @@ async function checkout(request, env, origin) {
   const session = await stripeRequest(stripeKey,'/checkout/sessions',form,id);
   if (session.livemode !== (mode === 'live') || !stripeSessionPattern.test(session.id ?? '') ||
       !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe invalide.',502);
-  const savedItems = items.map(({name,price,syncId,quantity})=>({name,price,syncId,quantity}));
+  const savedItems = items.map(({productId,name,price,syncId,quantity})=>({productId,name,price,syncId,quantity}));
   await env.DB.prepare('INSERT INTO shop_orders (id,session_id,data,customer_id) VALUES (?,?,?,?)')
     .bind(id,session.id,JSON.stringify({ id,mode,country,items:savedItems,shippingFee:shipping.fee,payment:'unpaid',printful:'none' }),customer?.id ?? null).run();
   return json({ url:session.url, sessionId:session.id });
@@ -87,6 +87,9 @@ async function checkoutResult(request, env) {
   const order = saved.payment === 'paid' && saved.printfulId ? saved : await reconcileOrder(env,row);
   return json({
     reference:order.id, payment:order.payment, mode:order.mode ?? 'test',
+    analytics:order.payment==='paid'?{shipping:(order.shippingFee??0)/100,items:order.items.map(item=>({
+      item_id:item.productId || String(item.syncId),item_name:item.name,price:item.price/100,quantity:item.quantity
+    }))}:null,
     total:order.items.reduce((sum,item)=>sum+item.price*item.quantity,0) + (order.shippingFee ?? 0)
   });
 }

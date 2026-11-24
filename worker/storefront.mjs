@@ -103,7 +103,7 @@ function contactLinks(profile) {
     phone && '<a href="tel:'+htmlEscape(phone.replace(/[^+0-9]/g,''))+'">'+htmlEscape(phone)+'</a>'
   ].filter(Boolean).join('');
 }
-function storefrontFooter(profile,en) {
+function storefrontFooter(profile,en,hasAnalytics) {
   return '<footer class="shop-footer"><div><a class="brand" href="'+languagePath('/',en)+'">TSŪ<span aria-hidden="true">✷</span></a>'+
     (profile.businessName ? '<p>'+htmlEscape(profile.businessName)+'</p>' : '')+contactLinks(profile)+'</div>'+
     '<nav aria-label="'+local(en,'Informations boutique','Store information')+'">'+
@@ -112,6 +112,7 @@ function storefrontFooter(profile,en) {
     navLink('/conditions-de-vente',en,'Conditions de vente','Terms of sale')+navLink('/confidentialite',en,'Confidentialité','Privacy')+
     navLink('/a-propos',en,'À propos de TSŪ','About TSŪ')+navLink('/faq',en,'FAQ','FAQ')+
     '<a href="'+local(en,'/espace-client','/en/account')+'#newsletter">Newsletter</a>'+
+    (hasAnalytics?'<button id="analytics-settings" type="button">'+local(en,'Préférences de statistiques','Statistics preferences')+'</button>':'')+
     '</nav></footer>';
 }
 function homeContent(items,settings,en,member) {
@@ -264,7 +265,7 @@ async function renderStorefront(request,env) {
     manualEdition ? {...weeklyEdition,...manualEdition} : weeklyEdition;
   const managedArticle=route.slug && route.page==='managed-article' ? await journalArticle(env,route.slug) : null;
   if (managedArticle && en && (!managedArticle.titleEn || !managedArticle.bodyEn)) return Response.redirect(origin+route.path,302);
-  const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
+  const [settings,profile,measurement] = await Promise.all([storefront(env),shopProfile(env),analyticsSettings(env)]);
   const product = route.id ? published.find(item=>item.id===route.id) : null;
   if (product && !canViewProduct(product,false)) headers['X-Robots-Tag'] = 'noindex, nofollow';
   const page = route.id ? (product ? 'product' : 'missing') : (route.week&&!edition || route.page==='managed-article'&&!managedArticle) ? 'missing' : route.page ?? storefrontPaths[route.path];
@@ -311,7 +312,9 @@ async function renderStorefront(request,env) {
     {'@type':'ListItem',position:2,name:heading,item:canonical}
   ]} : null;
   const title = heading+' | TSŪ';
-  const meta = '<title>'+htmlEscape(title)+'</title><meta name="description" content="'+htmlEscape(description)+'">'+
+  const verification=page==='home' && measurement.searchConsole
+    ? '<meta name="google-site-verification" content="'+htmlEscape(measurement.searchConsole)+'">' : '';
+  const meta = verification+'<title>'+htmlEscape(title)+'</title><meta name="description" content="'+htmlEscape(description)+'">'+
     ((!indexable || page==='missing') ? '<meta name="robots" content="noindex, nofollow">' : '')+
     (page==='missing' ? '' : '<link rel="canonical" href="'+htmlEscape(canonical)+'"><link rel="alternate" hreflang="fr" href="'+htmlEscape(origin+path)+'">'+(managedArticle && (!managedArticle.titleEn || !managedArticle.bodyEn) ? '' : '<link rel="alternate" hreflang="en" href="'+htmlEscape(origin+languagePath(path,true))+'">'))+
     '<link rel="alternate" type="application/rss+xml" title="Journal TSŪ" href="'+journalFeedPath(en)+'">'+
@@ -345,16 +348,25 @@ async function renderStorefront(request,env) {
       catalogLinks(departments,path,en)+'</nav>'+cards(items,en)+'</section>';
   }
   else main = '<article class="shop-section info-page"><h1>'+htmlEscape(heading)+'</h1>'+
-    (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+'</article>';
+    (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+
+    (page==='privacy' && (measurement.productionId || measurement.testId) ?
+      '<h2>'+local(en,'Mesure d’audience','Audience measurement')+'</h2><p>'+
+      local(en,'Avec ton consentement, Google Analytics mesure les visites, les clics vers la boutique et les étapes d’achat. Tu peux retirer ton consentement dans « Préférences de statistiques » en bas du site.',
+        'With your consent, Google Analytics measures visits, clicks to the shop and shopping activity. You can withdraw consent under “Statistics preferences” at the bottom of the site.')+'</p>' : '')+
+    '</article>';
+  const paymentMode=await checkoutMode(env,settings,profile);
+  const analyticsMode=env.TSU_INDEXABLE==='true' && paymentMode!=='test'?'live':'test';
+  const measurementId=analyticsMode==='live'?measurement.productionId:measurement.testId;
+  const analytics=gaMeasurementPattern.test(measurementId??'')?{id:measurementId,mode:analyticsMode,path:languagePath(path,en)}:null;
   const client = {
-    language:en?'en':'fr',checkoutMode:await checkoutMode(env,settings,profile),liveRequested:salesEnabled(env),countries:settings.countries,
+    analytics,language:en?'en':'fr',checkoutMode:paymentMode,liveRequested:salesEnabled(env),countries:settings.countries,
     shipping:profile.shipping ?? {},shippingPreview:Boolean(profile.shippingPreview),shippingPath:languagePath('/livraison-retours',en),
     products:published.map(({id,name,price,material,variants})=>({id,name,price,material,variants:variants.map(({id,size,color,label})=>({id,size,color,label}))}))
   };
   const template = new TextDecoder().decode(Uint8Array.from(atob(assets['/'][1]),char=>char.charCodeAt(0)));
   const replacements = {
     LANG:en?'en':'fr',META:meta,SKIP:local(en,'Aller au contenu','Skip to content'),
-    HEADER:storefrontHeader(path,settings,en,departments),MAIN:main,FOOTER:storefrontFooter(profile,en),DATA:jsonScript(client)
+    HEADER:storefrontHeader(path,settings,en,departments),MAIN:main,FOOTER:storefrontFooter(profile,en,Boolean(analytics)),CONSENT:analytics?analyticsControls(en):'',DATA:jsonScript(client)
   };
   return new Response(template.replace(/\{\{([A-Z]+)\}\}/g,(_,key)=>replacements[key]),{
     status:page==='missing'?404:200,headers:{...headers,'Content-Type':'text/html; charset=utf-8'}

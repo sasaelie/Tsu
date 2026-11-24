@@ -22,7 +22,20 @@
 <div class="fields"><label>Titre français <input name="tagFr" maxlength="120"></label><label>Titre anglais <input name="tagEn" maxlength="120"></label>
 <label>Texte français <textarea name="pitchFr" maxlength="300"></textarea></label><label>Texte anglais <textarea name="pitchEn" maxlength="300"></textarea></label></div>
 <fieldset><legend>Pays de livraison</legend><div class="checks"><label><input type="checkbox" name="be"> Belgique</label><label><input type="checkbox" name="fr"> France</label></div></fieldset>
-<button>Enregistrer la boutique</button></form></section>
+<button>Enregistrer la boutique</button></form>
+<h3>Google Analytics et Search Console</h3>
+<form id="analytics-form">
+<div class="fields">
+<label>ID GA4 de test <input name="testId" maxlength="32" placeholder="G-…"></label>
+<label>ID GA4 de production <input name="productionId" maxlength="32" placeholder="G-…"></label>
+<label>Jeton HTML Search Console <input name="searchConsole" maxlength="180" autocomplete="off"></label>
+</div>
+<p>Utilise un flux GA4 dédié aux tests. Désactive sa mesure améliorée et vérifie les événements dans DebugView. Le flux de production utilise un autre ID.</p>
+<p>Pour Search Console, ajoute une propriété « Préfixe de l’URL » et copie la valeur de <code>content</code> de la balise HTML. La vérification du site privé attendra son ouverture.</p>
+<p><a href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Analytics</a> · <a href="https://search.google.com/search-console/" target="_blank" rel="noopener noreferrer">Ouvrir Search Console</a> · <a href="/sitemap.xml">Sitemap TSŪ</a></p>
+<button type="submit" disabled>Enregistrer les réglages Google</button>
+<p id="analytics-status" role="status" aria-live="polite"></p>
+</form></section>
 <section id="profile" hidden>
 <h2>Coordonnées et livraison</h2>
 <p>Les coordonnées enregistrées ici alimentent le footer, la page Contact et les mentions légales.</p>

@@ -1,4 +1,5 @@
 import { createCart } from './cart.js';
+import { setupAnalytics } from './analytics.js';
 
 const get = id=>document.getElementById(id);
 const config = JSON.parse(get('store-data').textContent);
@@ -158,6 +159,7 @@ async function pay(control,items,result) {
     if (!directOrder) {
       try { sessionStorage.setItem(pendingCartKey,JSON.stringify({sessionId:data.sessionId,items})); } catch {}
     }
+    measureCart('begin_checkout',items);
     location.assign(data.url);
   } catch (error) {
     result.textContent = error.message;
@@ -165,6 +167,26 @@ async function pay(control,items,result) {
     control.disabled=false;
   }
 }
+const analytics=setupAnalytics(config.analytics);
+function measuredItems(lines) {
+  return lines.flatMap(line=>{
+    const product=cart.product(line.id);
+    if (!product) return [];
+    return [{item_id:product.id,item_name:product.name,item_variant:line.variantId,price:product.price/100,quantity:line.quantity}];
+  });
+}
+function measureCart(event,lines) {
+  const items=measuredItems(lines);
+  if (items.length) analytics.track(event,{items,currency:'EUR',
+    value:items.reduce((sum,item)=>sum+Math.round(item.price*100)*item.quantity,0)/100});
+}
+if (/^\/(?:en\/)?blog(?:\/|$)/.test(location.pathname)) document.addEventListener('click',event=>{
+  const link=event.target.closest?.('a[href]');
+  if (!link || link.origin!==location.origin) return;
+  if (/^\/(?:boutique|collections|produits|en\/(?:shop|collections|products))(?:\/|$)/.test(link.pathname)) {
+    analytics.track('journal_to_shop',{destination_path:link.pathname});
+  }
+});
 function openCheckout(item = null) {
   directOrder = item;
   renderCheckout();
@@ -172,6 +194,7 @@ function openCheckout(item = null) {
 }
 get('basket').addEventListener('click',()=>openCheckout());
 const productForm = get('product-actions');
+if (productForm) analytics.onStart(()=>measureCart('view_item',[{id:productForm.dataset.product,variantId:productForm.elements.variant.value,quantity:1}]));
 if (productForm) productForm.addEventListener('submit',event=>{
   event.preventDefault();
   const {variant,quantity} = Object.fromEntries(new FormData(productForm));
@@ -179,6 +202,7 @@ if (productForm) productForm.addEventListener('submit',event=>{
   if (event.submitter?.value==='buy') {
     openCheckout(item);
   } else if (cart.add(item.id,item.variantId,item.quantity)) {
+    measureCart('add_to_cart',[item]);
     get('product-feedback').textContent=t('Ajouté au panier.','Added to your cart.');
     get('product-feedback').dataset.tone='success';
   }
@@ -202,6 +226,7 @@ async function showCheckoutResult(sessionId, panel) {
     if (!response.ok) throw new Error();
     const order = await response.json();
     if (order.payment === 'paid') {
+      analytics.onStart(()=>analytics.purchase(order));
       clearPurchasedCart(sessionId);
       panel.replaceChildren(element('h1',order.mode === 'test'
         ? t('Paiement de test confirmé','Test payment confirmed') : t('Paiement confirmé','Payment confirmed')),

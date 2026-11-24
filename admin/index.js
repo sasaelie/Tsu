@@ -2,6 +2,7 @@ const get = id => document.getElementById(id);
 const form = get('product-form');
 const settingsForm = get('settings-form');
 const profileForm = get('profile-form');
+const analyticsForm = get('analytics-form');
 let state;
 let syncing = false;
 const euro = cents => new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(cents/100);
@@ -195,6 +196,23 @@ function tab(id) {
   if (id === 'products') syncCatalog();
 }
 document.querySelectorAll('[data-tab]').forEach(control=>{control.onclick=()=>tab(control.dataset.tab);});
+const analyticsFeedback=(message,tone)=>feedback(get('analytics-status'),message,tone);
+async function loadAnalyticsSettings() {
+  const data=await api('analytics');
+  for (const field of ['testId','productionId','searchConsole']) analyticsForm.elements[field].value=data[field];
+  analyticsForm.querySelector('button').disabled=false;
+}
+document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{
+  if (analyticsForm.querySelector('button').disabled) run(null,loadAnalyticsSettings,analyticsFeedback);
+});
+analyticsForm.onsubmit=event=>{
+  event.preventDefault();
+  return run(event.submitter,async()=>{
+    await api('analytics',Object.fromEntries(new FormData(analyticsForm)));
+    analyticsFeedback('Réglages Google enregistrés.','success');
+  },analyticsFeedback);
+};
+
 form.elements.audience.onchange=productAudience;
 get('new').onclick = ()=>editProduct();
 get('add-variant').onclick = ()=>variantRow();
@@ -399,6 +417,7 @@ run(null,async ()=>{
   if (!get('products').hidden) await syncCatalog();
   if (!get('customers').hidden) await showSupport();
   if (!get('journal').hidden) await refreshJournal();
+  if (!get('settings').hidden) await run(null,loadAnalyticsSettings,analyticsFeedback);
 });
 
 const journalForm=get('journal-form');

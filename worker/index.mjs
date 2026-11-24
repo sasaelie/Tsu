@@ -178,6 +178,8 @@ async function handle(request, env) {
       .bind(product.id,JSON.stringify(product)).run();
     return json(product);
   }
+  if (method==='GET' && pathname==='/api/admin/analytics') return json(await analyticsSettings(env));
+  if (method==='POST' && pathname==='/api/admin/analytics') return json(await saveAnalyticsSettings(env,await body(request,2048)));
   if (method === 'POST' && pathname === '/api/admin/settings') {
     const input = await body(request);
     const countries = ['BE','FR'].filter(country=>Array.isArray(input.countries) && input.countries.includes(country));

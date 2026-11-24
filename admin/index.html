@@ -1,8 +1,8 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/index.js"></script></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administration TSŪ</title><link rel="stylesheet" href="/admin/style.css"><script defer src="/admin/orders.js"></script><script defer src="/admin/index.js"></script></head>
 <body><header><a href="/">TSŪ <span>Boutique</span></a><a href="/compte"><span>Mon compte</span></a></header>
 <main><h1>Gérer TSŪ</h1><p id="identity"></p><p id="notice" role="status" aria-live="polite"></p>
 <nav aria-label="Administration"><button data-tab="products">Produits</button><button data-tab="settings">Boutique</button><button data-tab="profile">Coordonnées et livraison</button><button data-tab="printful">Printful</button><button data-tab="orders">Commandes et tests</button><button data-tab="customers">Clients et newsletter</button><button data-tab="journal">Journal</button></nav>
-<section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
+<section id="products"><div class="heading"><h2>Produits</h2><button type="button" id="new">Nouveau produit</button></div><p id="catalog-schedule-status" role="status" hidden></p><p id="catalog-sync-status" role="status" hidden></p><button type="button" id="sync-catalog" hidden>Actualiser depuis Printful</button><div id="product-list"></div>
 <form id="product-form" hidden><h3>Fiche produit</h3><input name="id" type="hidden"><div class="fields">
 <label>Nom <input name="name" required maxlength="100"></label><label>Catégorie <select name="type" required><option value="">Choisir la catégorie</option><option value="tee">T-shirt</option><option value="sweat">Pull ou sweat</option><option value="acc">Accessoire</option></select></label>
 <label>Prix en euros <input name="price" type="number" min="0.50" max="9999" step="0.01" required></label><label>URL HTTPS de la photo <input name="image" type="url" maxlength="2048"></label>
@@ -90,7 +90,15 @@
 </section>
 <section id="orders" hidden>
 <h2>Commandes et tests</h2>
+<p><a href="/admin/retractations">Consulter les rétractations</a></p>
 <p id="connections"></p>
+<form id="fulfillment-form">
+<h3>Fabrication Printful</h3>
+<label><input type="checkbox" id="auto-fulfillment"> Envoyer automatiquement les nouvelles commandes réelles payées</label>
+<p>L’activation autorise Printful à facturer et à fabriquer les nouveaux achats après confirmation du paiement. Les commandes de test restent en brouillon. La désactivation suspend les prochains envois automatiques.</p>
+<button type="submit">Enregistrer le choix de fabrication</button>
+<p id="fulfillment-status" role="status"></p>
+</form>
 <details id="stripe-settings">
 <summary id="stripe-settings-label">Connecter Stripe en mode test</summary>
 <form id="stripe-form">

@@ -28,7 +28,7 @@ async function stripeWebhook(request, env, mode) {
   if (!signature || signature.length > 4096) fail('Signature Stripe invalide.');
   const maxSize = 256_000;
   if (Number(request.headers.get('content-length')) > maxSize) fail('Événement trop volumineux.',413);
-  const payload = new Uint8Array(await request.arrayBuffer());
+  const payload = await limitedBody(request,maxSize);
   if (payload.length > maxSize) fail('Événement trop volumineux.',413);
   if (!await verifyStripeSignature(signature,payload,secret)) fail('Signature Stripe invalide.');
   let event;
@@ -38,11 +38,24 @@ async function stripeWebhook(request, env, mode) {
   const sessionId = event.data?.object?.id;
   if (typeof sessionId !== 'string' || !stripeSessionPattern.test(sessionId)) fail('Session Stripe invalide.');
   const row = await env.DB.prepare('SELECT session_id, data FROM shop_orders WHERE session_id = ?').bind(sessionId).first();
-  if (!row) return json({received:true});
+  if (!row) {
+    const stripeObject=event.data?.object;
+    if (stripeObject?.metadata?.tsu_order_id && stripeObject.metadata.tsu_order_id===stripeObject.client_reference_id) {
+      fail('La commande TSŪ est en cours d’enregistrement.',503);
+    }
+    return json({received:true});
+  }
   const saved = JSON.parse(row.data);
   if ((saved.mode ?? 'test') !== mode) fail('Environnement de commande invalide.');
-  if (saved.payment === 'paid' && saved.printfulId) return json({received:true});
+  if (saved.payment==='paid' && saved.printfulId) {
+    const outstanding = mode==='live' && saved.autoFulfill===true && ['draft','onhold'].includes(saved.printful) && salesEnabled(env) && await automaticFulfillment(env);
+    if (!outstanding) return json({received:true});
+  }
   const order = await reconcileOrder(env,row,event.type);
-  if (order.payment === 'paid' && !order.printfulId) fail('La création du brouillon Printful sera réessayée.',503);
+  const awaitingCosts=mode==='live' && order.autoFulfill===true && order.printful==='onhold' &&
+    salesEnabled(env) && await automaticFulfillment(env);
+  if (order.syncInProgress || awaitingCosts || (order.payment==='paid' && (!order.printfulId || order.error))) {
+    fail('Le traitement de la commande Printful sera réessayé.',503);
+  }
   return json({received:true});
 }

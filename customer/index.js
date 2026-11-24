@@ -8,13 +8,15 @@ const date = value=>new Intl.DateTimeFormat(en?'en-IE':'fr-BE',{dateStyle:'mediu
   .format(new Date(value.replace(' ','T')+'Z'));
 let account;
 let mode = 'login';
+let recovery = new URLSearchParams(location.hash.slice(1)).get('recovery');
+if (recovery) history.replaceState(null,'',location.pathname+location.search);
 let verification = new URLSearchParams(location.hash.slice(1)).get('verification');
 if (verification) history.replaceState(null,'','#newsletter');
 if (en) {
   document.documentElement.lang='en';
   document.title='My account | TSŪ';
   const labels = {
-    title:'My account', 'open-login':'Sign in', 'open-register':'Create an account','email-label':'Email address',
+    title:'My account','forgot-password':'Forgot password?', 'open-login':'Sign in', 'open-register':'Create an account','email-label':'Email address',
     'password-label':'Password','password-hint':'At least 15 characters.','guest-news':'Create an account to join the newsletter and browse subscriber-only designs.',
     signout:'Sign out','orders-title':'My orders','tickets-title':'My support tickets','ticket-order-label':'Related order (optional)',
     'ticket-subject-label':'Subject','ticket-message-label':'Message','ticket-submit':'Open a ticket',
@@ -65,11 +67,20 @@ function togglePassword(visible) {
 function showMode(next) {
   mode=next;
   const register=mode==='register';
-  const title=register?t('Créer un compte','Create an account'):t('Se connecter','Sign in');
+  const asking=mode==='reset-request';
+  const resetting=mode==='reset-password';
+  const title=asking?t('Recevoir le lien de récupération','Send recovery link'):resetting?t('Enregistrer mon nouveau mot de passe','Save new password'):register?t('Créer un compte','Create an account'):t('Se connecter','Sign in');
   get('auth-title').textContent=get('auth-submit').textContent=title;
-  get('password-hint').hidden=!register;
-  auth.elements.password.minLength=register?15:1;
-  auth.elements.password.autocomplete=register?'new-password':'current-password';
+  get('password-label').textContent=resetting?t('Nouveau mot de passe','New password'):t('Mot de passe','Password');
+  get('auth-email-field').hidden=resetting;
+  auth.elements.email.disabled=resetting;
+  auth.elements.password.disabled=asking;
+  get('auth-password-field').hidden=get('password-toggle').hidden=asking;
+  get('forgot-password').hidden=mode!=='login';
+  get('password-hint').hidden=!(register||resetting);
+  auth.elements.password.value='';
+  auth.elements.password.minLength=register||resetting?15:1;
+  auth.elements.password.autocomplete=register||resetting?'new-password':'current-password';
   togglePassword(false);
 }
 function orderStatus(order) {
@@ -90,6 +101,11 @@ function orderEntry(order) {
   const list=element('ul');
   for(const product of order.items) list.append(element('li',product.quantity+' × '+product.name));
   item.append(list);
+  if (order.payment==='paid') {
+    const withdrawal=element('a',t('Se rétracter ici','Withdraw from your contract here'));
+    withdrawal.href=t('/retractation','/en/withdraw')+'?commande='+encodeURIComponent(order.id);
+    item.append(withdrawal);
+  }
   for (const shipment of order.shipments) {
     if (!shipment.number) continue;
     const label=t('Suivre le colis','Track parcel')+' '+shipment.number;
@@ -129,6 +145,7 @@ function ticketEntry(ticket) {
 }
 async function refresh(openTicket) {
   account=await api('state');
+  if (recovery && mode==='reset-password') { get('guest').hidden=false; get('client-panel').hidden=true; return; }
   get('guest').hidden=account.signedIn;
   get('client-panel').hidden=!account.signedIn;
   if (!account.signedIn) {
@@ -156,12 +173,34 @@ async function refresh(openTicket) {
   get('confirm-verification').hidden=!verification;
   get('member-designs').hidden=!account.member;
 }
+get('forgot-password').onclick=()=>{notice('');showMode('reset-request');auth.elements.email.focus();};
 get('open-login').onclick=()=>showMode('login');
 get('open-register').onclick=()=>showMode('register');
 get('password-toggle').onclick=()=>togglePassword(auth.elements.password.type==='password');
 auth.onsubmit=event=>{
   event.preventDefault();
-  run(event.submitter,async()=>{await api(mode,Object.fromEntries(new FormData(auth))); auth.reset(); await refresh(); if(location.hash==='#newsletter')get('newsletter').scrollIntoView();});
+  run(event.submitter,async()=>{
+    const input=Object.fromEntries(new FormData(auth));
+    if (mode==='reset-request') {
+      await api(mode,{email:input.email,language:en?'en':'fr'});
+      showMode('login');
+      notice(t('Si un compte correspond à cette adresse, tu recevras un lien valable 30 minutes.','If this address matches an account, you will receive a link valid for 30 minutes.'),'success');
+      return;
+    }
+    if (mode==='reset-password') {
+      await api(mode,{password:input.password,token:recovery,language:en?'en':'fr'});
+      recovery=null;
+      auth.reset();
+      showMode('login');
+      await refresh();
+      notice(t('Mot de passe enregistré. Connecte-toi avec ton nouveau mot de passe.','Your new password is saved. Sign in with it now.'),'success');
+      return;
+    }
+    await api(mode,input);
+    auth.reset();
+    await refresh();
+    if(location.hash==='#newsletter')get('newsletter').scrollIntoView();
+  });
 };
 get('signout').onclick=event=>run(event.currentTarget,async()=>{await api('logout',{}); await refresh(); showMode('login');});
 ticketForm.onsubmit=event=>{
@@ -171,5 +210,5 @@ ticketForm.onsubmit=event=>{
 get('newsletter-choice').onclick=event=>run(event.currentTarget,async()=>{await api('newsletter',{enabled:!account.newsletter}); await refresh(); notice(get('newsletter-state').textContent,'success');});
 get('request-verification').onclick=event=>run(event.currentTarget,async()=>{await api('send-verification',{}); notice(t('Lien de confirmation envoyé.','Verification link sent.'),'success');});
 get('confirm-verification').onclick=event=>run(event.currentTarget,async()=>{await api('verify',{token:verification}); verification=null; await refresh(); notice(t('Adresse confirmée.','Email verified.'),'success');});
-showMode(location.hash==='#newsletter'?'register':'login');
+showMode(recovery?'reset-password':location.hash==='#newsletter'?'register':'login');
 run(null,refresh);

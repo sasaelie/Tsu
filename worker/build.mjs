@@ -1,5 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs';
 
+if (process.env.VERCEL === '1') {
+  throw new Error('Le build Worker utilise les identités Sites. Sur Vercel, utiliser un point d’entrée avec authentification serveur indépendante.');
+}
+
 mkdirSync('dist/server', { recursive: true });
 mkdirSync('dist/.openai', { recursive: true });
 cpSync('.openai/hosting.json', 'dist/.openai/hosting.json');
@@ -11,6 +15,9 @@ const assets = Object.fromEntries([
   ['/shop.js', 'dist/shop.js', 'text/javascript; charset=utf-8'],
   ['/analytics.js', 'dist/analytics.js', 'text/javascript; charset=utf-8'],
   ['/cart.js', 'dist/cart.js', 'text/javascript; charset=utf-8'],
+  ['/favicon.ico', 'dist/favicon.ico', 'image/x-icon'],
+  ['/room-480.webp', 'dist/room-480.webp', 'image/webp'],
+  ['/room-960.webp', 'dist/room-960.webp', 'image/webp'],
   ['/room.webp', 'dist/room.webp', 'image/webp'],
   ['/journal-manga-anime.webp', 'dist/journal-manga-anime.webp', 'image/webp'],
   ['/journal-vestiaire-otaku.webp', 'dist/journal-vestiaire-otaku.webp', 'image/webp'],
@@ -22,9 +29,10 @@ const assets = Object.fromEntries([
   ['/customer/style.css', 'customer/style.css', 'text/css; charset=utf-8'],
   ['/admin', 'admin/index.html', 'text/html; charset=utf-8'],
   ['/admin/style.css', 'admin/style.css', 'text/css; charset=utf-8'],
+  ['/admin/orders.js', 'admin/orders.js', 'text/javascript; charset=utf-8'],
   ['/admin/index.js', 'admin/index.js', 'text/javascript; charset=utf-8']
 ].map(([url, file, type]) => [url, [type, readFileSync(file).toString('base64')]]));
 
-const workerModules = ['account','customer','support','newsletter','credentials','printful','stripe','shop-profile','delivery','checkout','stripe-webhook','editorial','journal-editions','editorial-ai','journal-studio','journal-syndication','analytics','storefront','index'];
+const workerModules = ['security','withdrawal','account','customer','support','newsletter','credentials','printful','stripe','shop-profile','delivery','checkout','stripe-webhook','editorial','journal-editions','editorial-ai','journal-studio','journal-syndication','analytics','storefront','index'];
 const code = workerModules.map(name=>readFileSync('worker/'+name+'.mjs','utf8')).join('\n');
 writeFileSync('dist/server/index.js','const assets = '+JSON.stringify(assets)+';\n'+code);

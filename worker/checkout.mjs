@@ -1,3 +1,16 @@
+async function automaticFulfillment(env) {
+  const settings = await env.DB.prepare('SELECT enabled FROM fulfillment_settings WHERE id=1').first();
+  return settings?.enabled === 1;
+}
+
+async function saveFulfillmentSettings(request, env) {
+  const {enabled} = await body(request,512);
+  if (typeof enabled !== 'boolean') fail('Choix de fabrication invalide.');
+  await env.DB.prepare('INSERT INTO fulfillment_settings(id,enabled) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled')
+    .bind(Number(enabled)).run();
+  return json({enabled});
+}
+
 async function checkoutItems(env, config, customer, country, lines) {
   if (!config.countries.includes(country) || !Array.isArray(lines) || !lines.length || lines.length > 20 || lines.some(line=>!line || typeof line !== 'object')) fail('Panier ou pays invalide.');
   const available = await products(env);
@@ -35,6 +48,7 @@ async function checkout(request, env, origin) {
     cancel_url:origin+returnPath+'?checkout=cancelled'+(directProduct ? '' : '#collection'),
     locale:english ? 'en' : 'fr',
     'adaptive_pricing[enabled]':'false',
+    'metadata[tsu_order_id]':id,
     'shipping_options[0][shipping_rate_data][type]':'fixed_amount',
     'shipping_options[0][shipping_rate_data][display_name]':language === 'en' ? 'Standard delivery' : 'Livraison standard',
     'shipping_options[0][shipping_rate_data][fixed_amount][currency]':'eur',
@@ -62,12 +76,13 @@ async function checkout(request, env, origin) {
     form.set(key+'[price_data][product_data][name]',item.name);
     form.set(key+'[quantity]',String(item.quantity));
   });
+  const autoFulfill = mode === 'live' && await automaticFulfillment(env);
   const session = await stripeRequest(stripeKey,'/checkout/sessions',form,id);
   if (session.livemode !== (mode === 'live') || !stripeSessionPattern.test(session.id ?? '') ||
       !session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') fail('Session Stripe invalide.',502);
   const savedItems = items.map(({productId,name,price,syncId,quantity})=>({productId,name,price,syncId,quantity}));
   await env.DB.prepare('INSERT INTO shop_orders (id,session_id,data,customer_id) VALUES (?,?,?,?)')
-    .bind(id,session.id,JSON.stringify({ id,mode,country,items:savedItems,shippingFee:shipping.fee,payment:'unpaid',printful:'none' }),customer?.id ?? null).run();
+    .bind(id,session.id,JSON.stringify({ id,mode,autoFulfill,country,items:savedItems,shippingFee:shipping.fee,payment:'unpaid',printful:'none' }),customer?.id ?? null).run();
   return json({ url:session.url, sessionId:session.id });
 }
 
@@ -94,12 +109,32 @@ async function checkoutResult(request, env) {
   });
 }
 
-async function patchOrder(env, id, changes, onlyWithoutDraft = false) {
-  const row = await env.DB.prepare(`UPDATE shop_orders SET data = json_patch(data, ?) WHERE id = ?${onlyWithoutDraft
-    ? " AND json_extract(data, '$.printfulId') IS NULL"
-    : ''} RETURNING data`).bind(JSON.stringify(changes),id).first();
-  if (row) return JSON.parse(row.data);
-  return JSON.parse((await env.DB.prepare('SELECT data FROM shop_orders WHERE id = ?').bind(id).first()).data);
+// Keep each Printful order tied to one TSŪ order even if a webhook, return
+// page and tracking refresh arrive together. Expired leases recover crashes.
+async function claimFulfillment(env,id,token) {
+  const now = epoch();
+  return env.DB.prepare(`UPDATE shop_orders SET data=json_set(data,'$.payment','paid'),
+    sync_token=?, sync_expires=? WHERE id=? AND sync_expires<=? RETURNING data`)
+    .bind(token,now+180,id,now).first();
+}
+
+async function currentOrder(env,id) {
+  const row=await env.DB.prepare('SELECT data FROM shop_orders WHERE id=?').bind(id).first();
+  return JSON.parse(row.data);
+}
+
+async function finishFulfillment(env,id,token,changes) {
+  const row=await env.DB.prepare(`UPDATE shop_orders SET data=json_patch(data,?),
+    sync_token=NULL,sync_expires=0 WHERE id=? AND sync_token=? RETURNING data`)
+    .bind(JSON.stringify(changes),id,token).first();
+  return row ? JSON.parse(row.data) : currentOrder(env,id);
+}
+
+function supplierState(order) {
+  if (!Number.isSafeInteger(order?.id) || order.id<1 || !order.status) fail('Réponse de commande Printful incomplète.',502);
+  return {printfulId:order.id, printful:order.status, shipments:(order.shipments ?? []).map(shipment=>({
+    number:shipment.tracking_number,url:shipment.tracking_url
+  }))};
 }
 
 async function reconcileOrder(env, row, eventType) {
@@ -121,21 +156,29 @@ async function reconcileOrder(env, row, eventType) {
     return updated ? JSON.parse(updated.data) : {...order,payment:'paid'};
   }
   if (live && session.automatic_tax?.status !== 'complete') fail('Stripe Tax n’a pas confirmé le calcul de cette commande.',502);
-  const paidOrder = order.payment === 'paid' ? order : await patchOrder(env,id,{payment:'paid'});
+  const token=crypto.randomUUID();
+  const claim=await claimFulfillment(env,id,token);
+  if (!claim) return {...await currentOrder(env,id),syncInProgress:true};
+  const paidOrder=JSON.parse(claim.data);
+  let changes={};
   try {
     if (!await activePrintful(env)) fail('Printful reste à connecter.',503);
     const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
     const address = shipping?.address;
     if (!address?.line1 || !address.postal_code || !address.city || address.country !== order.country || !shipping.name) fail('Adresse de livraison incomplète.');
-    const draft = await orderDraft(env,paidOrder,shipping,address);
-    return patchOrder(env,id,{
-      printful:draft.status, printfulId:draft.id, error:'',
-      shipments:(draft.shipments ?? []).map(shipment=>({ number:shipment.tracking_number, url:shipment.tracking_url }))
-    });
+    const supplierOrder=await orderDraft(env,paidOrder,shipping,address);
+    changes=supplierState(supplierOrder);
+    if (live && salesEnabled(env) && paidOrder.autoFulfill === true && supplierOrder.status==='draft' && await automaticFulfillment(env)) {
+      const confirmed=await printful(env,'/orders/'+supplierOrder.id+'/confirm',{});
+      if (confirmed?.id !== supplierOrder.id) fail('Confirmation Printful à vérifier.',502);
+      changes=supplierState(confirmed);
+      if (confirmed.status==='draft') fail('Printful attend toujours la confirmation de fabrication.',502);
+    }
+    changes.error='';
   } catch (error) {
-    if (paidOrder.printfulId) return {...paidOrder,error:'Impossible d’actualiser le statut Printful.'};
-    return patchOrder(env,id,{error:error.status ? error.message : 'Impossible de joindre Printful.'},true);
+    changes.error=error.status ? error.message : 'Impossible de joindre Printful.';
   }
+  return finishFulfillment(env,id,token,changes);
 }
 
 async function orderDraft(env, order, shipping, address) {

@@ -109,6 +109,7 @@ function storefrontFooter(profile,en,hasAnalytics) {
     '<nav aria-label="'+local(en,'Informations boutique','Store information')+'">'+
     navLink('/contact',en,'Contact','Contact')+navLink('/mentions-legales',en,'Mentions légales','Legal notice')+
     navLink('/livraison-retours',en,'Livraison et retours','Shipping and returns')+
+    '<a href="'+local(en,'/retractation','/en/withdraw')+'">'+local(en,'Se rétracter ici','Withdraw from your contract here')+'</a>'+
     navLink('/conditions-de-vente',en,'Conditions de vente','Terms of sale')+navLink('/confidentialite',en,'Confidentialité','Privacy')+
     navLink('/a-propos',en,'À propos de TSŪ','About TSŪ')+navLink('/faq',en,'FAQ','FAQ')+
     '<a href="'+local(en,'/espace-client','/en/account')+'#newsletter">Newsletter</a>'+
@@ -131,7 +132,7 @@ function homeContent(items,settings,en,member) {
   return '<section class="hero"><div class="intro"><span class="label">'+local(en,'Le vestiaire otaku','The otaku wardrobe')+
     '</span><h1>TSŪ<span>!</span></h1><p class="tag">'+htmlEscape(tag)+'</p><p class="pitch">'+htmlEscape(pitch)+'</p>'+
     '<a href="'+languagePath(catalogPath,en)+'" class="primary">'+local(en,'Voir la boutique','Visit the shop')+'</a></div>'+
-    '<div class="scene"><img src="/room.webp" width="1536" height="1024" alt="" fetchpriority="high"><span aria-hidden="true" class="sticker star">✷</span><span aria-hidden="true" class="sticker manga">ドン!</span><span aria-hidden="true" class="sticker heart">♥</span></div></section>'+
+    '<div class="scene"><img src="/room.webp" srcset="/room-480.webp 480w, /room-960.webp 960w, /room.webp 1536w" sizes="(max-width:750px) 100vw, 58vw" width="1536" height="1024" alt="" fetchpriority="high"><span aria-hidden="true" class="sticker star">✷</span><span aria-hidden="true" class="sticker manga">ドン!</span><span aria-hidden="true" class="sticker heart">♥</span></div></section>'+
     (collections ? '<section id="collections" class="shop-section"><h2>'+local(en,'Les rayons','Departments')+'</h2><div class="collection-grid">'+collections+'</div></section>' : '')+
     '<section id="collection" class="shop-section"><h2>'+local(en,featured.length?'À la une':'Dans la boutique',featured.length?'Featured':'In the shop')+'</h2>'+
     cards(selection,en)+'</section>'+
@@ -194,6 +195,7 @@ function shippingContent(settings,profile,en) {
       'For catalogue items sold at a distance, the withdrawal period is generally 14 calendar days from receipt. Making a product to order does not by itself remove this right. An item genuinely customised to your instructions may qualify for an exception, which must be disclosed before purchase.')+'</p><p>'+
     local(en,'Pour exercer ton droit, adresse une déclaration claire au vendeur, par exemple « Je vous notifie ma rétractation pour la commande [numéro], reçue le [date]. Nom et adresse : [coordonnées]. » Consulte les conditions de vente pour les modalités et frais de retour.',
       'To exercise your right, send the seller a clear statement, for example: “I hereby withdraw from order [number], received on [date]. Name and address: [details].” See the terms of sale for return instructions and costs.')+'</p>'+
+    '<p><a class="primary" href="'+local(en,'/retractation','/en/withdraw')+'">'+local(en,'Se rétracter ici','Withdraw from your contract here')+'</a></p>'+
     (profile.returnAddress ? '<p><strong>'+local(en,'Adresse de retour','Return address')+'</strong><br><span class="preserve-lines">'+htmlEscape(profile.returnAddress)+'</span></p>' : '')+
     '<p>'+navLink('/conditions-de-vente',en,'Consulter les conditions de vente','Read the terms of sale')+'</p>';
 }
@@ -277,7 +279,7 @@ async function renderStorefront(request,env) {
     ...Object.fromEntries(catalogTypes.map(type=>[type,typeName(type,en)])),
     contact:'Contact',legal:local(en,'Mentions légales','Legal notice'),shipping:local(en,'Livraison et retours','Shipping and returns'),
     terms:local(en,'Conditions de vente','Terms of sale'),privacy:local(en,'Confidentialité','Privacy'),
-    product:product?.name,missing:local(en,'Produit introuvable','Product not found')
+    product:product?.name,missing:route.id ? local(en,'Produit introuvable','Product not found') : local(en,'Article introuvable','Article not found')
   };
   const heading = page==='missing' ? titles.missing : (page==='focus' ? focusTitle(edition.focus,en) : null) || (managedArticle && local(en,managedArticle.titleFr,managedArticle.titleEn)) || route.title || titles[page];
   const canonical = origin+languagePath(path,en);
@@ -294,11 +296,17 @@ async function renderStorefront(request,env) {
   const journalImage = page==='article' ? staticArticleImage(route.article) :
     ['blog','edition','focus'].includes(page) ? journalImages.watch : null;
   const imageUrl=safePhoto(product?.image) || origin+(journalImage?.path ?? '/room.webp');
+  const paymentMode=await checkoutMode(env,settings,profile);
+  const offer = product && indexable && paymentMode==='live' && canViewProduct(product,false) &&
+    product.variants.some(variant=>variant.syncId) ? {
+      '@type':'Offer',priceCurrency:'EUR',price:(product.price/100).toFixed(2),url:canonical
+    } : null;
   const schema = product ? {
     '@context':'https://schema.org','@type':'Product',name:product.name,
     ...(safePhoto(product.image) ? {image:safePhoto(product.image)} : {}),
     ...(product[en?'en':'fr'] || product[en?'fr':'en'] ? {description} : {}),
     ...(product.material ? {material:product.material} : {}),
+    ...(offer ? {offers:offer} : {}),
     category:typeName(product.type,en),sku:product.id,url:canonical
   } : ['article','edition','focus','managed-article'].includes(page) ? {'@context':'https://schema.org','@type':'BlogPosting',headline:heading,description,url:canonical,
     datePublished:(managedArticle ?? edition)?.publishedAt.slice(0,10) ?? '2026-11-23',
@@ -328,7 +336,7 @@ async function renderStorefront(request,env) {
   if (page==='home') main = homeContent(published,settings,en,member)+(!checkoutReturn ? editorialPromo(en) : '');
   else if (page==='product') main = productContent(product,settings,en);
   else if (page==='managed-article') main = '<article class="shop-section info-page editorial">'+journalTrail+'<h1>'+htmlEscape(heading)+'</h1><div class="preserve-lines">'+
-    htmlEscape(local(en,managedArticle.bodyFr,managedArticle.bodyEn))+'</div><p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p></article>';
+    journalBodyHtml(local(en,managedArticle.bodyFr,managedArticle.bodyEn))+'</div><p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p></article>';
   else if (['about','faq','blog','article','archive','edition','focus'].includes(page)) {
     const [manual,weekly,articles]=['blog','archive'].includes(page)
       ? await Promise.all([listEditions(env,true),syndicatedJournal(env),journalArticles(env,true)]) : [[],[],[]];
@@ -349,13 +357,12 @@ async function renderStorefront(request,env) {
       catalogLinks(departments,path,en)+'</nav>'+cards(items,en)+'</section>';
   }
   else main = '<article class="shop-section info-page"><h1>'+htmlEscape(heading)+'</h1>'+
-    (page==='missing' ? navLink('/',en,'Retour à la boutique','Back to the store') : infoPage(page,settings,profile,en))+
+    (page==='missing' ? (route.id ? navLink(catalogPath,en,'Retour à la boutique','Back to the shop') : navLink('/blog',en,'Retour au Journal','Back to the Journal')) : infoPage(page,settings,profile,en))+
     (page==='privacy' && (measurement.productionId || measurement.testId) ?
       '<h2>'+local(en,'Mesure d’audience','Audience measurement')+'</h2><p>'+
       local(en,'Avec ton consentement, Google Analytics mesure les visites, les clics vers la boutique et les étapes d’achat. Tu peux retirer ton consentement dans « Préférences de statistiques » en bas du site.',
         'With your consent, Google Analytics measures visits, clicks to the shop and shopping activity. You can withdraw consent under “Statistics preferences” at the bottom of the site.')+'</p>' : '')+
     '</article>';
-  const paymentMode=await checkoutMode(env,settings,profile);
   const analyticsMode=env.TSU_INDEXABLE==='true' && paymentMode!=='test'?'live':'test';
   const measurementId=analyticsMode==='live'?measurement.productionId:measurement.testId;
   const analytics=gaMeasurementPattern.test(measurementId??'')?{id:measurementId,mode:analyticsMode,path:languagePath(path,en)}:null;

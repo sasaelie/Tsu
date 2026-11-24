@@ -1,5 +1,22 @@
 const journalArticlePath=slug=>'/blog/article-'+slug;
 
+// Only valid HTTPS destinations become links. All other article text remains escaped.
+function journalBodyHtml(body) {
+  const parts=[];
+  let start=0;
+  for (const match of body.matchAll(/https:\/\/[^\s<>"'«»]+/gu)) {
+    const token=match[0];
+    let url=token.replace(/[.,;:!?]+$/u,'');
+    while (url.endsWith(')') && url.split(')').length>url.split('(').length) url=url.slice(0,-1);
+    const href=safePhoto(url);
+    if (!href) continue;
+    parts.push(htmlEscape(body.slice(start,match.index)),externalEditorialLink(url,href));
+    start=match.index+url.length;
+  }
+  parts.push(htmlEscape(body.slice(start)));
+  return parts.join('');
+}
+
 function journalArticleRow(row,publicOnly) {
   return row && {slug:row.slug,...JSON.parse(publicOnly?row.published:row.draft),
     publishedAt:row.published_at,updatedAt:row.updated_at};

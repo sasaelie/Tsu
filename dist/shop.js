@@ -85,6 +85,7 @@ function deliveryControls(items,shipping) {
   const input = element('input',null,{type:'text',inputmode:'numeric',autocomplete:'postal-code',maxlength:'5'});
   input.value = postalCodes[destination] ?? '';
   label.append(input);
+  let pendingEstimate;
   const estimate = button(t('Estimer avec Printful','Get a Printful estimate'),async()=>{
     const postalCode = input.value.trim();
     if (!(destination==='BE'?/^\d{4}$/:/^\d{5}$/).test(postalCode)) {
@@ -92,21 +93,36 @@ function deliveryControls(items,shipping) {
       input.focus();
       return;
     }
+    const controller = new AbortController();
+    pendingEstimate = controller;
     estimate.disabled=true;
     status.textContent=t('Recherche du délai…','Checking delivery dates…');
     try {
-      const response = await fetch('/api/delivery/estimate',{method:'POST',headers:{'Content-Type':'application/json'},
+      const response = await fetch('/api/delivery/estimate',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},
         body:JSON.stringify({country:destination,postalCode,lines:items})});
       const data = await response.json();
+      if (controller.signal.aborted) return;
       if (!response.ok || !data.dates) throw new Error();
       const {start,end} = data.dates;
       const format = new Intl.DateTimeFormat(english?'en-IE':'fr-BE',{day:'numeric',month:'long',timeZone:'UTC'});
       status.textContent=t('Livraison estimée par Printful : ','Estimated delivery from Printful: ')+format.formatRange(new Date(start),new Date(end));
     } catch {
+      if (controller.signal.aborted) return;
       status.textContent=t('Estimation indisponible. ','Estimate unavailable. ')+fallback;
-    } finally { estimate.disabled=false; }
+    } finally {
+      if (pendingEstimate===controller) {
+        pendingEstimate=null;
+        estimate.disabled=false;
+      }
+    }
   });
-  input.addEventListener('input',()=>{postalCodes[destination]=input.value; status.textContent=fallback;});
+  input.addEventListener('input',()=>{
+    pendingEstimate?.abort();
+    pendingEstimate=null;
+    estimate.disabled=false;
+    postalCodes[destination]=input.value;
+    status.textContent=fallback;
+  });
   section.append(label,estimate,status);
   return section;
 }

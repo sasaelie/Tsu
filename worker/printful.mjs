@@ -126,3 +126,48 @@ async function validatePrintfulVariants(env, product) {
     variant.catalogId = valid.catalogId;
   }
 }
+
+async function catalogJobStatus(env) {
+  const row = await env.DB.prepare(
+    'SELECT next_offset, last_attempt_at, last_success_at, last_complete_at, last_complete_failed, last_status FROM printful_catalog_job WHERE id=1'
+  ).first();
+  return {configured:Boolean(env.TSU_CATALOG_CRON_SECRET?.length>=32), ...row};
+}
+
+// One page per invocation keeps retries small. The lease protects the cursor
+// across independent scheduler invocations and expires after an interrupted run.
+async function scheduledPrintfulCatalog(request, env) {
+  if (!['GET','POST'].includes(request.method)) return json({error:'Méthode refusée.'},405);
+  const expected = env.TSU_CATALOG_CRON_SECRET;
+  const header = request.headers.get('authorization') ?? '';
+  if (!expected || expected.length<32 || !header.startsWith('Bearer ') || header.length>520) {
+    return json({error:'Authentification requise.'},401);
+  }
+  const [actualHash, expectedHash] = await Promise.all([sha256(header.slice(7)),sha256(expected)]);
+  if (!equalHash(actualHash,expectedHash)) return json({error:'Authentification requise.'},401);
+  const lease = crypto.randomUUID();
+  const now = epoch();
+  const job = await env.DB.prepare(
+    "UPDATE printful_catalog_job SET lease_id=?,lease_until=?,last_attempt_at=?,last_status='running' WHERE id=1 AND lease_until<=? RETURNING next_offset,cycle_failed"
+  ).bind(lease,now+90,now,now).first();
+  if (!job) return json({state:'busy'},202);
+  try {
+    const receipts = customerEmailReady(env) ? await retryWithdrawalReceipts(env,2) : null;
+    const page = await (await importPrintfulPage(env,job.next_offset)).json();
+    const completed = page.next === null;
+    const cycleFailed = job.cycle_failed + page.failed;
+    const status = (completed ? cycleFailed : page.failed) ? 'partial' : 'ok';
+    const finished = epoch();
+    await env.DB.prepare(
+      'UPDATE printful_catalog_job SET next_offset=?,lease_id=NULL,lease_until=0,last_success_at=?,last_status=?, '+
+      'cycle_failed=?, last_complete_failed=CASE WHEN ? THEN ? ELSE last_complete_failed END, '+
+      'last_complete_at=CASE WHEN ? THEN ? ELSE last_complete_at END WHERE id=1 AND lease_id=?'
+    ).bind(page.next??0,finished,status,completed ? 0 : cycleFailed,Number(completed),cycleFailed,Number(completed),finished,lease).run();
+    return json({state:status,completed,cycleFailed,receipts,...page});
+  } catch (error) {
+    await env.DB.prepare(
+      "UPDATE printful_catalog_job SET lease_id=NULL,lease_until=0,last_status='error' WHERE id=1 AND lease_id=?"
+    ).bind(lease).run();
+    throw error;
+  }
+}

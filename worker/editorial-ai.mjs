@@ -60,7 +60,7 @@ async function saveEditorialAi(env,input) {
     {name:'AES-GCM',iv:base64Binary(existing.nonce)},encryption,base64Binary(existing.encrypted_key)));
   if (id==='agnes') {
     const probe=await editorialRequest(provider,key,'chat/completions',{
-      model:input.model,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:96,stream:false
+      model:input.model,messages:[{role:'user',content:'Réponds simplement « OK ».'}],max_tokens:96,stream:false
     });
     if (typeof probe?.choices?.[0]?.message?.content!=='string' || !probe.choices[0].message.content.trim()) fail('Agnes AI n’a pas confirmé l’accès au modèle.',502);
   } else {

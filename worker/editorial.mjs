@@ -30,24 +30,22 @@ const mangaSelection = [
     en:'For action. Chihiro, a swordsmith’s son, inherits a world where enchanted blades are coveted weapons. Start at volume one for clear fights, taut pacing and a hero whose silences matter.'},
   {title:'L’Atelier des Sorciers',author:'Kamome Shirahama',publisher:'Pika',release:'2026-11-12',editionFr:'tome 16 collector',editionEn:'volume 16 collector’s edition',
     source:'https://www.pika.fr/livre/latelier-des-sorciers-t16-collector-9791043311772/',
-    stream:'https://www.crunchyroll.com/series/GT00258001/witch-hat-atelier',streamTitle:'Crunchyroll',
-    availability:'https://www.justwatch.com/be/serie/latelier-des-sorciers',
+    watchSlug:'latelier-des-sorciers',
     fr:'Pour la magie et le dessin. Coco découvre que la magie se trace. Tourne quelques pages du tome 1 et observe les cadres, les tissus et les cercles magiques. Le monde s’apprend par les yeux autant que par l’histoire.',
     en:'For magic and artwork. Coco discovers that magic can be drawn. Open volume one and pay attention to the frames, fabrics and spell circles. You learn the world through its artwork as much as its story.'},
   {title:'SPY × FAMILY',author:'Tatsuya Endo',publisher:'Kurokawa',release:'2026-11-12',editionFr:'tome 17 collector',editionEn:'volume 17 collector’s edition',
     source:'https://www.fnac.com/a23176483/Spy-X-Family-Spy-x-Family-tome-17-collector-Tatsuya-Endo',
-    stream:'https://www.crunchyroll.com/series/G4PH0WXVJ/',streamTitle:'Crunchyroll',
+    watchSlug:'spy-x-family',
     fr:'Pour décrocher après une longue journée. Un espion monte une famille de couverture et chacun garde son propre secret. Le tome 1 fonctionne si tu veux rire sans renoncer à un peu d’action.',
     en:'For unwinding after a long day. A spy puts together a cover family, and everyone has their own secret. Volume one is a good pick if you want laughs with some action.'},
   {title:'Les Carnets de l’apothicaire',author:'Natsu Hyūga, Itsuki Nanao et Nekokurage',publisher:'Ki-oon',release:'2026-11-19',editionFr:'tome 17',editionEn:'volume 17',
     source:'https://ki-oon.com/9791032723531-les-carnets-de-l-apothicaire-edition-simple-volume-17',
-    stream:'https://www.crunchyroll.com/fr/series/G3KHEVDJ7/the-apothecary-diaries',streamTitle:'Crunchyroll',
-    availability:'https://www.justwatch.com/be/serie/les-carnets-de-lapothicaire',
+    watchSlug:'les-carnets-de-lapothicaire',
     fr:'Pour l’enquête. Mao Mao, une apothicaire de palais, remarque ce que les autres laissent passer. Prends le tome 1 de l’édition Ki-oon si tu aimes remonter la piste à partir d’un symptôme, d’un détail ou d’une contradiction.',
     en:'For a mystery. Palace apothecary Maomao notices what other people miss. Pick up volume one of this edition if you like following clues through symptoms, details and contradictions.'},
   {title:'Alice in Borderland',author:'Haro Asō',publisher:'Delcourt',release:'2026-11-19',editionFr:'tome 2 Perfect Edition',editionEn:'volume 2, Perfect Edition',
     source:'https://www.manga-news.com/index.php/manga/Alice-in-Borderland-Perfect-Edition/vol-2',
-    stream:'https://www.netflix.com/be-fr/title/80200575',streamTitle:'Netflix Belgique',
+    watchSlug:'alice-in-borderland',
     fr:'Pour les jeux psychologiques. Arisu se retrouve dans un Tokyo où il faut comprendre les règles assez vite pour rester en vie. Commence par le tome 1 de la Perfect Edition si tu cherches un récit intense et violent. L’adaptation Netflix est une série en prises de vues réelles.',
     en:'For psychological games. Arisu finds himself in a Tokyo where understanding the rules quickly is a matter of survival. Start with Perfect Edition volume one for an intense, violent story. The Netflix adaptation is live action.'}
 ];
@@ -107,7 +105,7 @@ const journal = [
       ['Prends ton t-shirt préféré','Grab your favourite T-shirt','Pose-le à plat. Mesure la largeur d’aisselle à aisselle, puis la longueur du haut de l’épaule vers le bas. Compare avec les mesures du vêtement de la fiche. Si le tableau indique un tour de poitrine, lis d’abord s’il parle du corps ou du vêtement.','Lay it flat. Measure armpit to armpit, then from the top of the shoulder to the hem. Compare those numbers with the garment measurements on the product page. If a chart lists chest circumference, first check whether it refers to the body or the garment.'],
       ['Regarde les épaules et la longueur séparément','Check shoulders and length separately','Une coupe oversize pensée pour ça peut avoir des épaules tombantes et plus de largeur. Prendre simplement une taille au-dessus peut surtout allonger le t-shirt. Compare les mesures selon le tombé que tu veux.','A deliberate oversized cut can have dropped shoulders and extra width. Going up one size may mostly make the shirt longer. Compare the measurements based on the silhouette you want.']
     ],
-    sources:[['Printful · Exemple de tableau de mesures d’un vêtement','https://www.printful.com/custom-products/size-guide?productId=880']]
+    sources:[['Printful · Comprendre les mesures en cm et en pouces','https://help.printful.com/hc/en-us/articles/50263523337489-How-can-I-change-the-measurement-units-of-my-products']]
   },
   {
     slug:'entretien-t-shirt-imprime-brode',enSlug:'printed-and-embroidered-shirt-care',
@@ -236,7 +234,7 @@ const referenceCalendars = [
   ['Pika Édition · Planning manga','https://www.pika.fr/planning-sorties/'],
   ['Glénat Manga · Planning','https://www.glenat.com/manga/planning-des-sorties/'],
   ['Manga-news · Sorties francophones','https://www.manga-news.com/index.php/planning'],
-  ['Crunchyroll · Simulcasts','https://www.crunchyroll.com/fr/simulcasts']
+  ['AnimeTracker · Calendrier de diffusion','https://animetracker.fr/calendrier']
 ];
 const practicalJournal = new Set(['taille-t-shirt-oversize','entretien-t-shirt-imprime-brode']);
 const staticArticleImage=article=>article.selection ? journalImages.watch : journalImages.wardrobe;
@@ -297,9 +295,10 @@ function articleEditorial(article,en) {
   const body = article.selection ? mangaSelection.map(book=>
     '<section><h2>'+htmlEscape(book.title)+'</h2><p class="article-meta">'+htmlEscape(book.author)+' · '+htmlEscape(book.publisher)+'</p><p>'+htmlEscape(local(en,book.fr,book.en))+'</p><p>'+
     externalEditorialLink(local(en,'Fiche du ','Listing for ')+local(en,book.editionFr,book.editionEn)+' · '+mangaDate(book.release,en),book.source)+
-    (book.stream?' · '+externalEditorialLink(local(en,'Fiche sur ','Listing on ')+book.streamTitle,book.stream):'')+
-    (book.availability?' · '+externalEditorialLink(local(en,'Disponibilité en Belgique · JustWatch','Availability in Belgium · JustWatch'),book.availability):'')+'</p></section>').join('')+
-    '<p>'+local(en,'Les liens de streaming indiquent les pages officielles. Le catalogue peut varier selon le pays.','Streaming links lead to official pages. Catalogues may vary by country.')+'</p>' :
+    (book.watchSlug?' · '+['be','fr'].map(region=>externalEditorialLink(
+      region==='be'?local(en,'Voir en Belgique','Watch in Belgium'):local(en,'Voir en France','Watch in France'),
+      'https://www.justwatch.com/'+region+'/serie/'+book.watchSlug)).join(' · '):'')+'</p></section>').join('')+
+    '<p>'+local(en,'Les liens JustWatch ouvrent le guide de streaming du pays choisi. Vérifie la saison, la langue et les offres disponibles.','JustWatch links open the local streaming guide. Check the season, language and available offers.')+'</p>' :
     article.sections.map(([frTitle,enTitle,frBody,enBody])=>'<section><h2>'+htmlEscape(local(en,frTitle,enTitle))+'</h2><p>'+htmlEscape(local(en,frBody,enBody))+'</p></section>').join('')+
     '<h2>'+local(en,'Sources et repères','Sources and references')+'</h2>'+editorialSources(article.sources,en);
   return '<p class="article-meta">'+navLink('/blog',en,'Le journal TSŪ','The TSŪ journal')+' · <time datetime="2026-11-23">'+

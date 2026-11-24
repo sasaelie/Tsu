@@ -11,8 +11,7 @@ const readData = async (db, sql, ...args) => {
 
 async function body(request, max = 30_000) {
   if (!request.headers.get('content-type')?.startsWith('application/json')) fail('Format JSON requis.');
-  const raw = await request.text();
-  if (raw.length > max) fail('Données trop volumineuses.', 413);
+  const raw = new TextDecoder().decode(await limitedBody(request,max));
   let data;
   try { data = JSON.parse(raw); } catch { fail('Données invalides.'); }
   if (!data || typeof data !== 'object' || Array.isArray(data)) fail('Données invalides.');
@@ -83,7 +82,7 @@ async function storefront(env) {
 }
 const products = env => readData(env.DB,'SELECT data FROM products ORDER BY rowid DESC');
 
-async function handle(request, env) {
+async function handle(request, env, ctx) {
   const { pathname, origin, searchParams } = new URL(request.url);
   const method = request.method;
   const section = searchParams.get(pathname.startsWith('/compte')?'destination':'tab');
@@ -93,6 +92,7 @@ async function handle(request, env) {
   const owner = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
   const account = pathname === '/compte' || pathname.startsWith('/compte/') || pathname.startsWith('/api/account/');
+  if (pathname==='/api/jobs/printful-catalog') return scheduledPrintfulCatalog(request,env);
   if (method==='POST' && pathname==='/mcp') return journalMcp(request,env);
   if (method === 'POST' && pathname === '/api/stripe/webhook') return stripeWebhook(request,env,'test');
   if (method === 'POST' && pathname === '/api/stripe/webhook/live') return stripeWebhook(request,env,'live');
@@ -104,12 +104,13 @@ async function handle(request, env) {
       : json({ error:'Connexion propriétaire requise.' },401);
   }
   if (method !== 'GET' && request.headers.get('origin') !== origin) return json({ error:'Origine refusée.' },403);
-  if (pathname.startsWith('/api/customer/')) return customerRoute(request,env,pathname.slice('/api/customer/'.length));
+  if (pathname.startsWith('/api/customer/')) return customerRoute(request,env,pathname.slice('/api/customer/'.length),ctx);
   if (pathname.startsWith('/api/account/')) return accountRoute(request,env,pathname.slice('/api/account/'.length),owner,email);
   if (admin && pathname !== '/admin/style.css' && !await ownerSession(request,env,owner)) {
     return pathname === '/admin' || pathname === '/admin/' ? Response.redirect(origin+'/compte'+(deepLink ? '?destination='+deepLink : ''),302)
       : json({error:'Connecte-toi à ton compte TSŪ.'},401);
   }
+  if (['/retractation','/en/withdraw','/admin/retractations'].includes(pathname)) return withdrawalRoute(request,env,pathname);
   if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte'+query,302);
   if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin'+(deepLink ? '?tab='+deepLink : ''),302);
   if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === journalFeedPath(false) || pathname === journalFeedPath(true) || storefrontRoute(pathname))) {
@@ -164,10 +165,12 @@ async function handle(request, env) {
   if (method === 'POST' && pathname === '/api/admin/printful') return printfulSetup(request,env);
   if (method === 'POST' && pathname === '/api/admin/stripe') return saveStripeConnection(request,env);
   if (method === 'POST' && pathname === '/api/admin/profile') return saveShopProfile(request,env);
+  if (pathname==='/api/admin/fulfillment' && method==='GET') return json({enabled:await automaticFulfillment(env)});
+  if (pathname==='/api/admin/fulfillment' && method==='POST') return saveFulfillmentSettings(request,env);
   if (method === 'GET' && pathname === '/api/admin/state') {
     const connection = await readPrintfulConnection(env);
     const [settings,profile] = await Promise.all([storefront(env),shopProfile(env)]);
-    return json({ email, products:await products(env), settings, profile, stripe:await stripeEnabled(env),
+    return json({ email, automaticFulfillment:await automaticFulfillment(env), catalogSchedule:await catalogJobStatus(env), products:await products(env), settings, profile, stripe:await stripeEnabled(env),
       checkoutMode:await checkoutMode(env,settings,profile), liveRequested:salesEnabled(env),
       printful:Boolean(connection || env.PRINTFUL_TOKEN), printfulStore:connection?.store_name, orders:await readData(env.DB,'SELECT created_at, data FROM shop_orders ORDER BY created_at DESC LIMIT 100') });
   }
@@ -193,8 +196,8 @@ async function handle(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
-    try { return await handle(request, env); }
+  async fetch(request, env, ctx) {
+    try { return protectResponse(await handle(request, env, ctx)); }
     catch (error) {
       if (!error.status) console.error(error.name, error.message);
       return json({ error:error.status ? error.message : 'Une erreur serveur est survenue.' },error.status ?? 500);

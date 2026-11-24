@@ -19,12 +19,13 @@
 <div class="client-actions"><button type="button" id="open-login">Se connecter</button><button type="button" id="open-register">Créer un compte</button></div>
 <form id="auth" class="client-form">
 <h2 id="auth-title">Se connecter</h2>
-<label><span id="email-label">Adresse e-mail</span><input name="email" type="email" autocomplete="email" maxlength="254" required></label>
-<label><span id="password-label">Mot de passe</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+<label id="auth-email-field"><span id="email-label">Adresse e-mail</span><input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+<label id="auth-password-field"><span id="password-label">Mot de passe</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
 <button type="button" id="password-toggle" aria-pressed="false">Afficher le mot de passe</button>
 <p id="password-hint" hidden>15 caractères minimum.</p>
 <button type="submit" id="auth-submit" class="primary">Se connecter</button>
 </form>
+<button type="button" id="forgot-password">Mot de passe oublié ?</button>
 <p id="guest-news" hidden>Crée ton compte pour t’inscrire à la newsletter et accéder aux designs réservés.</p>
 </section>
 <div id="client-panel" hidden>

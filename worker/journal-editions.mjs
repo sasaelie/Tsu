@@ -72,7 +72,7 @@ function editionEditorial(edition,en) {
   return '<p class="article-meta">'+navLink('/blog/archives',en,'Archives du journal','Journal archive')+'</p>'+
     (intro?'<p class="editorial-lead">'+htmlEscape(intro)+'</p>':'')+journalFigure(journalImages.watch,en,true)+sections+
     (edition.focus?'<p>'+navLink(focusPath(edition.week),en,'Lire le dossier de la semaine','Read the weekly spotlight')+'</p>':'')+
-    '<p>'+externalEditorialLink(local(en,'Vérifier les simulcasts sur Crunchyroll','Check simulcasts on Crunchyroll'),'https://www.crunchyroll.com/fr/simulcasts')+'</p>'+
+    '<p>'+externalEditorialLink(local(en,'Consulter le calendrier anime','Check the anime broadcast calendar'),'https://animetracker.fr/calendrier')+'</p>'+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';
 }
 

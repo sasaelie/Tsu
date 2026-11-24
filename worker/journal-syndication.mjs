@@ -65,7 +65,7 @@ function focusArticle(edition,en) {
     journalFigure(journalImages.watch,en,true)+
     '<h2>'+local(en,'Date annoncée et source','Listed date and source')+'</h2><p><time datetime="'+release.date+'">'+mangaDate(release.date,en)+'</time> · '+primary+'</p>'+
     '<h2>'+local(en,'Le repère TSŪ','The TSŪ guide')+'</h2><p>'+advice+'</p>'+
-    (watch?'<p>'+externalEditorialLink(local(en,'Consulter les simulcasts de Crunchyroll','Check Crunchyroll simulcasts'),'https://www.crunchyroll.com/fr/simulcasts')+'</p>':'')+
+    (watch?'<p>'+externalEditorialLink(local(en,'Consulter le calendrier anime','Check the anime broadcast calendar'),'https://animetracker.fr/calendrier')+'</p>':'')+
     (additional?'<h2>'+local(en,'Autres références','Related sources')+'</h2><ul class="editorial-sources">'+additional+'</ul>':'')+
     '<p>'+navLink(editionPath(edition.week),en,'Voir toutes les sorties de la semaine','See all releases this week')+'</p>'+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';

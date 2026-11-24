@@ -22,14 +22,15 @@ function customerResponse(token, seconds) {
   return response;
 }
 
-async function newCustomerSession(request, env, customerId) {
+async function newCustomerSession(request, env, customerId, verifiedHash) {
   const token = randomHex(32);
   const former = customerCookieToken(request);
   const now = epoch();
   const statements = [env.DB.prepare('DELETE FROM customer_sessions WHERE expires_at<=?').bind(now)];
   if (former) statements.push(env.DB.prepare('DELETE FROM customer_sessions WHERE token_hash=?').bind(await sha256(former)));
-  statements.push(env.DB.prepare('INSERT INTO customer_sessions VALUES (?,?,?)').bind(await sha256(token),customerId,now+customerLifetime));
-  await env.DB.batch(statements);
+  statements.push(env.DB.prepare('INSERT INTO customer_sessions SELECT ?,id,? FROM customers WHERE id=? AND password_hash=?').bind(await sha256(token),now+customerLifetime,customerId,verifiedHash));
+  const results=await env.DB.batch(statements);
+  if (!results.at(-1).meta.changes) fail('Reconnecte-toi avec ton nouveau mot de passe.',401);
   return customerResponse(token,customerLifetime);
 }
 
@@ -81,13 +82,13 @@ async function customerAuthentication(request, env, action) {
     const result = await env.DB.prepare('INSERT INTO customers (id,email,salt,password_hash) VALUES (?,?,?,?) ON CONFLICT(email) DO NOTHING')
       .bind(id,email,salt,hash).run();
     if (!result.meta.changes) fail('Ce compte existe déjà. Connecte-toi.',409);
-    return newCustomerSession(request,env,id);
+    return newCustomerSession(request,env,id,hash);
   }
   const customer = await env.DB.prepare('SELECT id,salt,password_hash FROM customers WHERE email=?').bind(email).first();
   const hash = await passwordHash('client:'+password,customer?.salt ?? '00000000000000000000000000000000',env.TSU_AUTH_PEPPER);
   if (!customer || !equalHash(hash,customer.password_hash)) fail('Adresse e-mail ou mot de passe invalide.',401);
   await env.DB.prepare('DELETE FROM customer_attempts WHERE key=?').bind(await sha256('login-email\n'+email)).run();
-  return newCustomerSession(request,env,customer.id);
+  return newCustomerSession(request,env,customer.id,hash);
 }
 
 function customerOrder(row) {
@@ -114,7 +115,27 @@ function canViewProduct(product, member) {
   return true;
 }
 
-async function customerRoute(request, env, action) {
+async function customerRecovery(request,env,action,ctx) {
+  const input=await body(request,4096);
+  const en=input.language==='en';
+  if (action==='reset-password') return resetCredential(request,env,'customer',input);
+  if (!customerEmailReady(env)) fail(en?'Password recovery email is temporarily unavailable.':'L’envoi du lien de récupération est momentanément indisponible.',503);
+  const email=normalizedEmail(input.email);
+  if (!emailPattern.test(email) || email.length>254) fail(en?'Enter a valid email address.':'Renseigne une adresse e-mail valide.');
+  await customerLimit(env,'recovery-ip',request.headers.get('cf-connecting-ip') || 'local',12,3600);
+  await customerLimit(env,'recovery-email',email,3,3600);
+  const deliver=async()=>{
+    const customer=await env.DB.prepare('SELECT id FROM customers WHERE email=?').bind(email).first();
+    if (customer) await sendRecovery(request,env,'customer',customer.id,email,en);
+  };
+  const delivery=deliver().catch(()=>{ console.error('TSŪ customer recovery email delivery failed'); });
+  if (ctx?.waitUntil) ctx.waitUntil(delivery);
+  else await delivery;
+  return json({ok:true},202);
+}
+
+async function customerRoute(request, env, action, ctx) {
+  if (request.method==='POST' && (action==='reset-request' || action==='reset-password')) return customerRecovery(request,env,action,ctx);
   if (request.method==='POST' && ['register','login'].includes(action)) return customerAuthentication(request,env,action);
   if (request.method==='POST' && action==='logout') {
     const token = customerCookieToken(request);

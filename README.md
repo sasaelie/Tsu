@@ -65,3 +65,11 @@ Le Journal regroupe trois familles de recherches en français et en anglais. Les
 | Tenues otaku, taille et entretien | Guides reliés entre eux | Ajouter un exemple concret, une illustration pertinente et, selon le sujet, un lien vers les consignes officielles ou vers le rayon correspondant. |
 
 Le site reste en accès privé et en `noindex` pendant la préparation. Au lancement public, activer l’indexation, soumettre `/sitemap.xml` à Search Console, vérifier l’URL du Journal et ses traductions, puis suivre les pages indexées, les impressions et les clics par groupe de pages. Mettre à jour les guides quand une source ou un exemple change. Conserver les URL existantes et vérifier les destinations après chaque mise à jour.
+
+## Migration Vercel et Supabase
+
+Le portage de la base boutique, la vérification du compte propriétaire, les essais en préproduction et le retour arrière sont détaillés dans le [guide de migration](MIGRATION-VERCEL.md).
+
+## Tests de régression
+
+Depuis la racine, avec Node 22.13 ou ultérieur, exécuter `node worker/build.mjs` puis `node --test tests/*.mjs`. Les tests utilisent SQLite en mémoire et des réponses de fournisseurs simulées.

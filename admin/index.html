@@ -25,16 +25,21 @@
 <button>Enregistrer la boutique</button></form>
 <h3>Google Analytics et Search Console</h3>
 <form id="analytics-form">
-<div class="fields">
-<label>ID GA4 de test <input name="testId" maxlength="32" placeholder="G-…"></label>
-<label>ID GA4 de production <input name="productionId" maxlength="32" placeholder="G-…"></label>
-<label>Jeton HTML Search Console <input name="searchConsole" maxlength="180" autocomplete="off"></label>
-</div>
-<p>Utilise un flux GA4 dédié aux tests. Désactive sa mesure améliorée et vérifie les événements dans DebugView. Le flux de production utilise un autre ID.</p>
-<p>Pour Search Console, ajoute une propriété « Préfixe de l’URL » et copie la valeur de <code>content</code> de la balise HTML. La vérification du site privé attendra son ouverture.</p>
-<p><a href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Ouvrir Google Analytics</a> · <a href="https://search.google.com/search-console/" target="_blank" rel="noopener noreferrer">Ouvrir Search Console</a> · <a href="/sitemap.xml">Sitemap TSŪ</a></p>
-<button type="submit" disabled>Enregistrer les réglages Google</button>
+<h4>Tester Google Analytics</h4>
+<p id="ga-setup-state" role="status"></p>
+<p><a href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">1. Ouvrir Google Analytics</a></p>
+<label>2. Colle l’ID de test ou le code Google Analytics complet
+<textarea name="testId" maxlength="3500" rows="2" placeholder="G-…"></textarea></label>
+<button type="submit" disabled>3. Enregistrer et activer le test</button>
 <p id="analytics-status" role="status" aria-live="polite"></p>
+<p id="ga-setup-test" hidden><a href="/?analytics_test=1" target="_blank" rel="noopener">Lancer le test GA4</a></p>
+<details>
+<summary>Préparer l’ouverture publique</summary>
+<label>ID ou code de la propriété GA4 de production <textarea name="productionId" maxlength="3500" rows="2" placeholder="G-…"></textarea></label>
+<label>Balise ou jeton HTML Search Console <textarea name="searchConsole" maxlength="500" rows="2" autocomplete="off"></textarea></label>
+<p>Dans Search Console, choisis « Préfixe de l’URL », puis « Balise HTML ». Tu pourras lancer la vérification Google à l’ouverture du site.</p>
+<p><a href="https://search.google.com/search-console/" target="_blank" rel="noopener noreferrer">Ouvrir Search Console</a> · <a href="/sitemap.xml">Ouvrir le sitemap</a></p>
+</details>
 </form></section>
 <section id="profile" hidden>
 <h2>Coordonnées et livraison</h2>

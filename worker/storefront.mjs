@@ -226,7 +226,8 @@ function infoPage(key,settings,profile,en) {
 async function renderStorefront(request,env) {
   const {pathname, origin, searchParams} = new URL(request.url);
   const checkoutReturn = searchParams.has('checkout_session');
-  const indexable = env.TSU_INDEXABLE === 'true' && !checkoutReturn;
+  const analyticsTest=searchParams.get('analytics_test')==='1';
+  const indexable = env.TSU_INDEXABLE === 'true' && !checkoutReturn && !analyticsTest;
   const headers = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':checkoutReturn ? 'no-referrer' : 'strict-origin-when-cross-origin'};
   if (!indexable) headers['X-Robots-Tag'] = 'noindex, nofollow';
   if (pathname==='/robots.txt') {
@@ -358,6 +359,10 @@ async function renderStorefront(request,env) {
   const analyticsMode=env.TSU_INDEXABLE==='true' && paymentMode!=='test'?'live':'test';
   const measurementId=analyticsMode==='live'?measurement.productionId:measurement.testId;
   const analytics=gaMeasurementPattern.test(measurementId??'')?{id:measurementId,mode:analyticsMode,path:languagePath(path,en)}:null;
+  if (page==='home' && analyticsTest && analytics?.mode==='test' && !checkoutReturn &&
+      await ownerSession(request,env,request.headers.get('oai-authenticated-user-id'))) {
+    main=analyticsTestControls(en)+main;
+  }
   const client = {
     analytics,language:en?'en':'fr',checkoutMode:paymentMode,liveRequested:salesEnabled(env),countries:settings.countries,
     shipping:profile.shipping ?? {},shippingPreview:Boolean(profile.shippingPreview),shippingPath:languagePath('/livraison-retours',en),

@@ -63,6 +63,19 @@ export function setupAnalytics(settings) {
   panel.hidden=choice==='yes' || choice==='no';
   if (choice==='yes') start();
 
+  const testButton=document.getElementById('analytics-test-send');
+  if (testButton && mode==='test') testButton.onclick=()=>{
+    const status=document.getElementById('analytics-test-status');
+    if (choice!=='yes' || !started) {
+      panel.hidden=false;
+      document.getElementById('analytics-accept').focus();
+      status.textContent=document.documentElement.lang==='en'?'Accept statistics, then send the signal.':'Accepte les statistiques, puis envoie le signal.';
+      return;
+    }
+    track('tsu_test_signal',{debug_mode:true});
+    status.textContent=document.documentElement.lang==='en'?'Signal requested. Check DebugView.':'Signal demandé. Vérifie dans DebugView.';
+  };
+
   return {
     track,
     onStart(listener) { if (started) listener(); else listeners.push(listener); },

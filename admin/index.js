@@ -197,10 +197,14 @@ function tab(id) {
 }
 document.querySelectorAll('[data-tab]').forEach(control=>{control.onclick=()=>tab(control.dataset.tab);});
 const analyticsFeedback=(message,tone)=>feedback(get('analytics-status'),message,tone);
-async function loadAnalyticsSettings() {
-  const data=await api('analytics');
+function showAnalyticsSettings(data) {
   for (const field of ['testId','productionId','searchConsole']) analyticsForm.elements[field].value=data[field];
   analyticsForm.querySelector('button').disabled=false;
+  get('ga-setup-state').textContent=data.testId?'ID de test enregistré.':'Récupère le code de ta propriété GA4 de test pour commencer.';
+  get('ga-setup-test').hidden=!data.testId;
+}
+async function loadAnalyticsSettings() {
+  showAnalyticsSettings(await api('analytics'));
 }
 document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{
   if (analyticsForm.querySelector('button').disabled) run(null,loadAnalyticsSettings,analyticsFeedback);
@@ -208,7 +212,7 @@ document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{
 analyticsForm.onsubmit=event=>{
   event.preventDefault();
   return run(event.submitter,async()=>{
-    await api('analytics',Object.fromEntries(new FormData(analyticsForm)));
+    showAnalyticsSettings(await api('analytics',Object.fromEntries(new FormData(analyticsForm))));
     analyticsFeedback('Réglages Google enregistrés.','success');
   },analyticsFeedback);
 };

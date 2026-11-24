@@ -155,6 +155,7 @@ async function handle(request, env) {
   if (method === 'POST' && pathname === '/api/admin/journal/articles') return json(await saveJournalArticle(env,await body(request,22000)));
   if (method === 'GET' && ['/api/admin/editorial-ai','/api/admin/deepseek'].includes(pathname)) return json(await editorialStatus(env));
   if (method === 'POST' && ['/api/admin/editorial-ai','/api/admin/deepseek'].includes(pathname)) return json(await saveEditorialAi(env,await body(request,2048)));
+  if (method === 'POST' && pathname === '/api/admin/editorial-ai/chat') return editorialConversation(env,await body(request,42000));
   if (method === 'POST' && ['/api/admin/editorial-ai/generate','/api/admin/deepseek/generate'].includes(pathname)) return json(await generateEditorialAi(env,await body(request,39000)));
   if (method === 'GET' && pathname === '/api/admin/journal') return json({editions:await listEditions(env)});
   if (method === 'POST' && pathname === '/api/admin/journal/save') return json(await saveEdition(env,await body(request,26000)));

@@ -62,3 +62,20 @@ textarea { resize: vertical; }
 [data-tone=pending] { background: #e8ecff; color: #263b83; }
 
 #login-result:not(:empty) { padding: .65rem; }
+
+#ai-chat {
+  width: min(44rem, calc(100% - 1rem));
+  max-height: calc(100dvh - 1rem);
+  padding: 1rem;
+  border: 2px solid #1c1922;
+  background: white;
+  color: inherit;
+}
+#ai-chat::backdrop { background: #1c192288; }
+#ai-chat .heading h3 { margin: 0; }
+#ai-chat .heading form { margin: 0; padding: 0; background: transparent; }
+#ai-chat-content { max-height: 42dvh; overflow-y: auto; overscroll-behavior: contain; }
+.chat-message { margin: .5rem 0; padding: .65rem; background: #fff9ec; }
+.chat-message p { margin: .35rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#ai-chat-status:not(:empty) { padding: .55rem; }
+#ai-result p { margin: .15rem 0 .9rem; }

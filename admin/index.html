@@ -108,7 +108,18 @@
 <h3>Veille automatique Supabase</h3>
 <p id="watch-status" role="status"></p><div id="watch-drafts"></div>
 <h3>Atelier IA</h3>
-<p>Prépare tes articles, optimise leurs titres et descriptions, compare des pages ou trouve des idées de design.</p>
+<button type="button" id="ai-chat-open" disabled>Ouvrir la conversation IA</button>
+<p>Pose une question dans la conversation ou prépare un brouillon avec le formulaire.</p>
+<dialog id="ai-chat" aria-labelledby="ai-chat-title">
+  <div class="heading"><h3 id="ai-chat-title">Conversation IA</h3><form method="dialog"><button type="submit">Fermer</button></form></div>
+  <p>Pour vérifier une actualité, colle des extraits datés avec leur lien. La recherche web se fait en dehors de cet atelier.</p>
+  <div id="ai-chat-content" role="log" aria-label="Messages de la conversation" aria-live="off" tabindex="0"></div>
+  <form id="ai-chat-form">
+    <label>Ton message <textarea name="message" maxlength="4000" required placeholder="Quelles sources vérifier pour les prochaines sorties Naruto ?"></textarea></label>
+    <button type="submit">Envoyer</button>
+    <p id="ai-chat-status" role="status" aria-live="polite"></p>
+  </form>
+</dialog>
 <form id="ai-config">
 <label>Fournisseur <select name="provider" required></select></label>
 <label>Clé API <input name="key" type="password" maxlength="300" autocomplete="off"></label>
@@ -123,12 +134,13 @@
 <option value="seo">Optimiser le titre et le référencement</option><option value="competition">Analyser la concurrence</option>
 <option value="design">Proposer des idées de design</option></select></label>
 <label>Sujet ou consignes <textarea name="brief" maxlength="4000"></textarea></label>
-<label>Sources ou extraits publics à analyser <textarea name="sources" maxlength="11000"></textarea></label>
+<label>Extraits de sources publiques <textarea name="sources" maxlength="11000" aria-describedby="ai-source-help" placeholder="Exemple : 24 novembre, site de l’éditeur, lien et extrait de l’annonce"></textarea></label>
+<p id="ai-source-help">Colle ici ce que tu as trouvé. Mets tes consignes et demandes dans « Sujet ou consignes ». La recherche web se fait en dehors de cet atelier.</p>
 <p>Le fournisseur connecté reçoit les champs ci-dessus et, pour la révision ou le SEO, le texte du brouillon ouvert.</p>
 <button type="submit" disabled>Générer une proposition</button>
 <p id="ai-request-status" role="status" aria-live="polite"></p>
 <button type="button" id="ai-apply" hidden>Appliquer à mon brouillon</button>
-<pre id="ai-result" class="editorial-output" hidden aria-live="polite"></pre>
+<div id="ai-result" class="editorial-output" hidden></div>
 </form>
 <h3>Articles du Journal</h3>
 <button id="article-new" type="button">Nouvel article</button>
@@ -146,7 +158,7 @@
 <button type="submit" value="draft">Enregistrer le brouillon</button>
 <button type="submit" value="publish">Publier cet article</button>
 </form>
-<h3>Éditions hebdomadaires</h3>
+<h3>Éditions créées manuellement</h3>
 <div id="journal-editions"></div>
 <form id="journal-form" hidden>
 <div class="fields">

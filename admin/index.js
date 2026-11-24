@@ -437,7 +437,7 @@ async function refreshJournal(){
   const {editions}=await api('journal');
   const list=get('journal-editions');
   list.replaceChildren();
-  if(!editions.length) list.append(element('p','Aucune édition hebdomadaire pour le moment.'));
+  if(!editions.length) list.append(element('p','Aucune édition créée manuellement pour le moment.'));
   for(const edition of editions){
     const entry=element('p',edition.week+' · '+(edition.publishedAt?'Publiée':'Brouillon')+' · '+edition.items.length+' sortie(s) ');
     if(edition.publishedAt){
@@ -552,7 +552,16 @@ async function refreshWatch(editions) {
 
 const aiConfig=get('ai-config');
 const aiRequest=get('ai-request');
+const aiChat=get('ai-chat');
+const chatForm=get('ai-chat-form');
+const chatContent=get('ai-chat-content');
+let chatProvider;
+let chatHistory=[];
 let aiState=null;
+const articleFieldLabels={
+  titleFr:'Titre français',titleEn:'Titre anglais',seoFr:'Métadescription française',seoEn:'Métadescription anglaise',
+  bodyFr:'Texte français',bodyEn:'Texte anglais'
+};
 function setEditorialModels(provider,selectedModel) {
   aiConfig.elements.model.replaceChildren(...provider.models.map(model=>new Option(model.name,model.id)));
   if (selectedModel) aiConfig.elements.model.value=selectedModel;
@@ -566,8 +575,100 @@ function showEditorialAi(state) {
   const provider=state.providers.find(entry=>entry.id===state.provider);
   setEditorialModels(provider,state.model);
   aiRequest.querySelector('[type="submit"]').disabled=!state.connected;
+  get('ai-chat-open').disabled=!state.connected;
+  get('ai-chat-open').textContent='Parler à '+provider.name;
+  get('ai-chat-title').textContent='Conversation avec '+provider.name;
+  if (chatProvider && chatProvider!==state.provider) {
+    chatHistory=[];
+    chatContent.replaceChildren();
+  }
+  chatProvider=state.provider;
   feedback(get('ai-status'),state.connected?provider.name+' connecté.':provider.name+' à connecter.',state.connected?'success':'neutral');
 }
+get('ai-chat-open').onclick=()=>{
+  if (!chatForm.elements.message.value) chatForm.elements.message.value=aiRequest.elements.brief.value;
+  aiChat.showModal();
+  chatForm.elements.message.focus();
+};
+function chatMessage(label,value) {
+  const entry=element('article',null,'chat-message');
+  const message=element('p',value);
+  entry.append(element('strong',label),message);
+  chatContent.append(entry);
+  chatContent.scrollTop=chatContent.scrollHeight;
+  return message;
+}
+async function readChatReply(messages,onDelta) {
+  const response=await fetch('/api/admin/editorial-ai/chat',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})
+  });
+  if (!response.ok) {
+    const payload=await response.json().catch(()=>null);
+    throw new Error(payload?.error??'La conversation est momentanément indisponible.');
+  }
+  if (!response.body) throw new Error('La réponse n’a pas pu être ouverte.');
+  let buffer='';
+  let finish;
+  const reader=response.body.pipeThrough(new TextDecoderStream()).getReader();
+  try {
+    while (true) {
+      const {done,value}=await reader.read();
+      buffer+=value??'';
+      const lines=buffer.split('\n');
+      buffer=lines.pop();
+      if (done && buffer) lines.push(buffer);
+      for (const line of lines.filter(Boolean)) {
+        const event=JSON.parse(line);
+        if (event.error) throw new Error(event.error);
+        if (event.delta) onDelta(event.delta);
+        if (event.finish) finish=event.finish;
+      }
+      if (done) break;
+    }
+  } finally {
+    await reader.cancel().catch(()=>{});
+    reader.releaseLock();
+  }
+  if (!finish) throw new Error('La réponse s’est interrompue.');
+  return finish;
+}
+chatForm.onsubmit=e=>{
+  e.preventDefault();
+  const field=chatForm.elements.message;
+  const question=field.value.trim();
+  if (!aiState?.connected || !question) return;
+  const provider=aiState.providers.find(item=>item.id===aiState.provider);
+  const report=(message,tone)=>feedback(get('ai-chat-status'),message,tone);
+  const sent={role:'user',content:question};
+  const history=[...chatHistory.slice(-8),sent];
+  return run(e.submitter,async()=>{
+    field.value='';
+    field.disabled=true;
+    chatMessage('Toi',question);
+    const answer=chatMessage(provider.name,'');
+    let reply='';
+    report('En attente de la réponse…','pending');
+    try {
+      const finish=await readChatReply(history,delta=>{
+        const follow=chatContent.scrollHeight-chatContent.scrollTop-chatContent.clientHeight<36;
+        if (!reply) report('Réponse en cours…','pending');
+        reply+=delta;
+        answer.textContent=reply;
+        if (follow) chatContent.scrollTop=chatContent.scrollHeight;
+      });
+      if (!reply.trim()) throw new Error('La réponse reçue est vide.');
+      chatHistory=[...history,{role:'assistant',content:reply.slice(0,4000)}];
+      report(finish==='length'?'La réponse a atteint sa limite de longueur. Tu peux demander la suite.':'Réponse terminée.',finish==='length'?'neutral':'success');
+    } catch(error) {
+      if (!reply) answer.textContent='Aucun texte reçu.';
+      field.value=question;
+      throw error;
+    } finally {
+      field.disabled=false;
+      if (aiChat.open) field.focus();
+    }
+  },report);
+};
 aiConfig.elements.provider.onchange=()=>{
   aiConfig.elements.key.value='';
   setEditorialModels(aiState.providers.find(entry=>entry.id===aiConfig.elements.provider.value));
@@ -599,11 +700,20 @@ aiRequest.onsubmit=e=>{
     report('Génération en cours…','pending');
     const proposal=await api('editorial-ai/generate',data);
     const output=get('ai-result');
-    output.textContent=proposal.analysis??Object.values(proposal.fields).filter(Boolean).join('\n\n');
-    output.hidden=false;
+    output.replaceChildren();
+    if (proposal.fields) {
+      for (const [field,value] of Object.entries(proposal.fields)) {
+        if (value) output.append(element('strong',articleFieldLabels[field]),element('p',value));
+      }
+    } else if (proposal.analysis) {
+      output.append(element('p',proposal.analysis));
+    } else if (proposal.reply) {
+      output.append(element('strong','Réponse reçue'),element('p',proposal.reply));
+    }
+    output.hidden=!output.childElementCount;
     aiProposal=proposal.fields??null;
     get('ai-apply').hidden=!aiProposal;
-    report('Proposition prête.','success');
+    report(proposal.message??'Proposition prête.',proposal.message?'neutral':'success');
   },report);
 };
 get('ai-apply').onclick=()=>{

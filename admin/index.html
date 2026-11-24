@@ -107,12 +107,14 @@
 <div class="heading"><button id="journal-new" type="button">Nouvelle édition</button><button id="journal-refresh" type="button">Actualiser</button><a href="/blog">Voir le journal</a></div>
 <h3>Veille automatique Supabase</h3>
 <p id="watch-status" role="status"></p><div id="watch-drafts"></div>
-<h3>Atelier DeepSeek</h3>
+<h3>Atelier IA</h3>
 <p>Prépare tes articles, optimise leurs titres et descriptions, compare des pages ou trouve des idées de design.</p>
 <form id="ai-config">
-<label>Clé API DeepSeek <input name="key" type="password" maxlength="300" autocomplete="off"></label>
-<label>Modèle <select name="model"><option value="deepseek-flash">DeepSeek Flash</option><option value="deepseek-v4-pro">DeepSeek V4 Pro</option></select></label>
-<button type="submit">Vérifier et connecter DeepSeek</button>
+<label>Fournisseur <select name="provider" required></select></label>
+<label>Clé API <input name="key" type="password" maxlength="300" autocomplete="off"></label>
+<label>Modèle <select name="model" required></select></label>
+<button type="submit">Vérifier et connecter</button>
+<p><a id="ai-key-link" href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" rel="noopener noreferrer" hidden>Créer une clé API Agnes</a></p>
 <p id="ai-status" role="status"></p>
 </form>
 <form id="ai-request">
@@ -122,8 +124,8 @@
 <option value="design">Proposer des idées de design</option></select></label>
 <label>Sujet ou consignes <textarea name="brief" maxlength="4000"></textarea></label>
 <label>Sources ou extraits publics à analyser <textarea name="sources" maxlength="11000"></textarea></label>
-<p>DeepSeek reçoit les champs ci-dessus et, pour la révision ou le SEO, le texte du brouillon ouvert.</p>
-<button type="submit">Générer une proposition</button>
+<p>Le fournisseur connecté reçoit les champs ci-dessus et, pour la révision ou le SEO, le texte du brouillon ouvert.</p>
+<button type="submit" disabled>Générer une proposition</button>
 <button type="button" id="ai-apply" hidden>Appliquer à mon brouillon</button>
 <pre id="ai-result" class="editorial-output" hidden aria-live="polite"></pre>
 </form>

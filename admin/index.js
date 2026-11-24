@@ -447,7 +447,7 @@ async function refreshJournal(){
     } else entry.append(button('Relire et modifier',()=>editJournal(edition)));
     list.append(entry);
   }
-  const results=await Promise.allSettled([refreshWatch(editions),refreshArticles(),api('deepseek').then(showDeepseek)]);
+  const results=await Promise.allSettled([refreshWatch(editions),refreshArticles(),api('editorial-ai').then(showEditorialAi)]);
   const failed=results.find(result=>result.status==='rejected');
   if (failed) throw failed.reason;
 }
@@ -552,25 +552,38 @@ async function refreshWatch(editions) {
 
 const aiConfig=get('ai-config');
 const aiRequest=get('ai-request');
-let aiConnected=false;
-function showDeepseek(state) {
-  aiConnected=state.connected;
-  aiConfig.elements.model.value=state.model;
-  aiRequest.querySelector('[type="submit"]').disabled=!aiConnected;
-  feedback(get('ai-status'),aiConnected?'DeepSeek connecté.':'DeepSeek à connecter.',aiConnected?'success':'neutral');
+let aiState=null;
+function setEditorialModels(provider,selectedModel) {
+  aiConfig.elements.model.replaceChildren(...provider.models.map(model=>new Option(model.name,model.id)));
+  if (selectedModel) aiConfig.elements.model.value=selectedModel;
+  get('ai-key-link').hidden=provider.id!=='agnes';
 }
+function showEditorialAi(state) {
+  aiState=state;
+  aiConfig.elements.provider.replaceChildren(...state.providers.map(provider=>new Option(provider.name,provider.id)));
+  aiConfig.elements.provider.value=state.provider;
+  const provider=state.providers.find(entry=>entry.id===state.provider);
+  setEditorialModels(provider,state.model);
+  aiRequest.querySelector('[type="submit"]').disabled=!state.connected;
+  feedback(get('ai-status'),state.connected?provider.name+' connecté.':provider.name+' à connecter.',state.connected?'success':'neutral');
+}
+aiConfig.elements.provider.onchange=()=>{
+  aiConfig.elements.key.value='';
+  setEditorialModels(aiState.providers.find(entry=>entry.id===aiConfig.elements.provider.value));
+};
 aiConfig.onsubmit=e=>{
   e.preventDefault();
-  const {key,model}=Object.fromEntries(new FormData(aiConfig));
+  if (!aiState) return;
+  const {key,provider,model}=Object.fromEntries(new FormData(aiConfig));
   return run(e.submitter,async()=>{
-    const state=await api('deepseek',{key,model});
+    const state=await api('editorial-ai',{key,provider,model});
     aiConfig.elements.key.value='';
-    showDeepseek(state);
+    showEditorialAi(state);
   });
 };
 aiRequest.onsubmit=e=>{
   e.preventDefault();
-  if (!aiConnected) return;
+  if (!aiState?.connected) return;
   aiProposal=null;
   get('ai-apply').hidden=true;
   get('ai-result').hidden=true;
@@ -579,7 +592,7 @@ aiRequest.onsubmit=e=>{
     data.draft=Object.fromEntries(articleFields.map(field=>[field,articleForm.elements[field].value]));
   }
   return run(e.submitter,async()=>{
-    const proposal=await api('deepseek/generate',data);
+    const proposal=await api('editorial-ai/generate',data);
     const output=get('ai-result');
     output.textContent=proposal.analysis??Object.values(proposal.fields).filter(Boolean).join('\n\n');
     output.hidden=false;

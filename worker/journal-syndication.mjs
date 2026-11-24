@@ -7,7 +7,7 @@ async function watchResponse(env,query={}) {
   try {
     const url=new URL(env.TSU_WATCH_URL);
     for (const [key,value] of Object.entries(query)) url.searchParams.set(key,value);
-    const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(5000),
+    const response=await fetch(url.href,{redirect:'manual',signal:AbortSignal.timeout(5000),
       headers:{'x-tsu-watch-token':env.TSU_WATCH_READ_TOKEN}});
     if (response.ok) return await response.json();
   } catch {}

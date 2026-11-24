@@ -19,10 +19,10 @@ async function api(route = 'state', data) {
   if (!response.ok) throw new Error(result.error ?? 'Requête impossible.');
   return result;
 }
-async function run(button, action) {
+async function run(button, action, report=notice) {
   if (button) button.disabled = true;
-  notice('');
-  try { await action(); } catch (error) { notice(error.message,'error'); }
+  report('');
+  try { await action(); } catch (error) { report(error.message,'error'); }
   finally { if (button) button.disabled = false; }
 }
 function element(tag, value, className) {
@@ -447,7 +447,7 @@ async function refreshJournal(){
     } else entry.append(button('Relire et modifier',()=>editJournal(edition)));
     list.append(entry);
   }
-  const results=await Promise.allSettled([refreshWatch(editions),refreshArticles(),api('editorial-ai').then(showEditorialAi)]);
+  const results=await Promise.allSettled([refreshWatch(editions),refreshArticles(),api('editorial-ai').then(showEditorialAi, error=>feedback(get('ai-status'),error.message,'error'))]);
   const failed=results.find(result=>result.status==='rejected');
   if (failed) throw failed.reason;
 }
@@ -560,6 +560,7 @@ function setEditorialModels(provider,selectedModel) {
 }
 function showEditorialAi(state) {
   aiState=state;
+  aiConfig.querySelector('[type="submit"]').disabled=false;
   aiConfig.elements.provider.replaceChildren(...state.providers.map(provider=>new Option(provider.name,provider.id)));
   aiConfig.elements.provider.value=state.provider;
   const provider=state.providers.find(entry=>entry.id===state.provider);
@@ -575,11 +576,13 @@ aiConfig.onsubmit=e=>{
   e.preventDefault();
   if (!aiState) return;
   const {key,provider,model}=Object.fromEntries(new FormData(aiConfig));
+  const report=(message,tone)=>feedback(get('ai-status'),message,tone);
   return run(e.submitter,async()=>{
+    report('Vérification de la clé en cours…','pending');
     const state=await api('editorial-ai',{key,provider,model});
     aiConfig.elements.key.value='';
     showEditorialAi(state);
-  });
+  },report);
 };
 aiRequest.onsubmit=e=>{
   e.preventDefault();
@@ -591,14 +594,17 @@ aiRequest.onsubmit=e=>{
   if (!articleForm.hidden && ['edit','seo'].includes(data.action)) {
     data.draft=Object.fromEntries(articleFields.map(field=>[field,articleForm.elements[field].value]));
   }
+  const report=(message,tone)=>feedback(get('ai-request-status'),message,tone);
   return run(e.submitter,async()=>{
+    report('Génération en cours…','pending');
     const proposal=await api('editorial-ai/generate',data);
     const output=get('ai-result');
     output.textContent=proposal.analysis??Object.values(proposal.fields).filter(Boolean).join('\n\n');
     output.hidden=false;
     aiProposal=proposal.fields??null;
     get('ai-apply').hidden=!aiProposal;
-  });
+    report('Proposition prête.','success');
+  },report);
 };
 get('ai-apply').onclick=()=>{
   if (!aiProposal) return;

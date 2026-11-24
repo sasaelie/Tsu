@@ -113,9 +113,9 @@
 <label>Fournisseur <select name="provider" required></select></label>
 <label>Clé API <input name="key" type="password" maxlength="300" autocomplete="off"></label>
 <label>Modèle <select name="model" required></select></label>
-<button type="submit">Vérifier et connecter</button>
+<button type="submit" disabled>Vérifier et connecter</button>
+<p id="ai-status" role="status" aria-live="polite"></p>
 <p><a id="ai-key-link" href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" rel="noopener noreferrer" hidden>Créer une clé API Agnes</a></p>
-<p id="ai-status" role="status"></p>
 </form>
 <form id="ai-request">
 <label>Action <select name="action">
@@ -126,6 +126,7 @@
 <label>Sources ou extraits publics à analyser <textarea name="sources" maxlength="11000"></textarea></label>
 <p>Le fournisseur connecté reçoit les champs ci-dessus et, pour la révision ou le SEO, le texte du brouillon ouvert.</p>
 <button type="submit" disabled>Générer une proposition</button>
+<p id="ai-request-status" role="status" aria-live="polite"></p>
 <button type="button" id="ai-apply" hidden>Appliquer à mon brouillon</button>
 <pre id="ai-result" class="editorial-output" hidden aria-live="polite"></pre>
 </form>

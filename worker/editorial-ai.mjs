@@ -17,7 +17,7 @@ async function editorialRequest(provider,key,path,parameters) {
   let response;
   try {
     response=await fetch(provider.base+path,{
-      method:parameters?'POST':'GET',redirect:'error',
+      method:parameters?'POST':'GET',redirect:'manual',
       headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
       body:parameters?JSON.stringify(parameters):undefined,
       signal:AbortSignal.timeout(30000)
@@ -25,11 +25,13 @@ async function editorialRequest(provider,key,path,parameters) {
   } catch {
     fail(provider.name+' ne répond pas. Réessaie dans un instant.',502);
   }
+  if (response.status>=300 && response.status<400) fail(provider.name+' a redirigé la requête. La connexion est interrompue.',502);
   if (response.status===401 || response.status===403) fail(provider.name+' a refusé la clé API ou l’accès au modèle.',422);
   if (response.status===402) fail('Crédit '+provider.name+' insuffisant.',422);
   if (response.status===429) fail('Limite '+provider.name+' atteinte. Réessaie dans un instant.',429);
   if (response.status===404) fail('Modèle '+provider.name+' indisponible.',422);
-  if (!response.ok) fail(provider.name+' n’a pas pu traiter la demande.',502);
+  if (response.status===400 || response.status===422) fail(provider.name+' a refusé les paramètres de la requête (HTTP '+response.status+').',422);
+  if (!response.ok) fail(provider.name+' n’a pas pu traiter la demande (HTTP '+response.status+').',502);
   try { return await response.json(); }
   catch { fail(provider.name+' a renvoyé une réponse illisible.',502); }
 }
@@ -57,9 +59,9 @@ async function saveEditorialAi(env,input) {
     {name:'AES-GCM',iv:base64Binary(existing.nonce)},encryption,base64Binary(existing.encrypted_key)));
   if (id==='agnes') {
     const probe=await editorialRequest(provider,key,'chat/completions',{
-      model:input.model,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:16,stream:false
+      model:input.model,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:96,stream:false
     });
-    if (!probe?.choices?.[0]?.message?.content?.trim()) fail('Agnes AI n’a pas confirmé l’accès au modèle.',502);
+    if (typeof probe?.choices?.[0]?.message?.content!=='string' || !probe.choices[0].message.content.trim()) fail('Agnes AI n’a pas confirmé l’accès au modèle.',502);
   } else {
     const models=await editorialRequest(provider,key,'models');
     if (!models.data?.some(entry=>entry.id===input.model)) fail('Ce modèle est indisponible pour cette clé.',422);

@@ -57,3 +57,6 @@ textarea { resize: vertical; }
 #stripe-form button{margin-top:.85rem}
 #stripe-result:not(:empty){padding:.65rem;margin:.65rem 0 0}
 .editorial-output { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 30rem; overflow: auto; }
+
+#ai-status:not(:empty), #ai-request-status:not(:empty) { padding: .65rem; }
+[data-tone=pending] { background: #e8ecff; color: #263b83; }

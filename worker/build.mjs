@@ -24,6 +24,6 @@ const assets = Object.fromEntries([
   ['/admin/index.js', 'admin/index.js', 'text/javascript; charset=utf-8']
 ].map(([url, file, type]) => [url, [type, readFileSync(file).toString('base64')]]));
 
-const workerModules = ['account','customer','support','newsletter','credentials','printful','stripe','shop-profile','delivery','checkout','stripe-webhook','editorial','journal-editions','deepseek','journal-studio','storefront','index'];
+const workerModules = ['account','customer','support','newsletter','credentials','printful','stripe','shop-profile','delivery','checkout','stripe-webhook','editorial','journal-editions','deepseek','journal-studio','journal-syndication','storefront','index'];
 const code = workerModules.map(name=>readFileSync('worker/'+name+'.mjs','utf8')).join('\n');
 writeFileSync('dist/server/index.js','const assets = '+JSON.stringify(assets)+';\n'+code);

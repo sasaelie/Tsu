@@ -37,15 +37,10 @@ async function saveJournalArticle(env,input) {
 }
 
 async function journalWatch(env) {
-  if (!env.TSU_WATCH_URL || !env.TSU_WATCH_READ_TOKEN) return {configured:false,drafts:[],runs:[]};
-  let result;
-  try {
-    const response=await fetch(env.TSU_WATCH_URL,{redirect:'error',signal:AbortSignal.timeout(8000),
-      headers:{'x-tsu-watch-token':env.TSU_WATCH_READ_TOKEN}});
-    if (response.ok) result=await response.json();
-  } catch {}
+  if (!env.TSU_WATCH_URL || !env.TSU_WATCH_READ_TOKEN) return {configured:false,drafts:[],runs:[],published:[]};
+  const [result,published]=await Promise.all([watchResponse(env),syndicatedJournal(env)]);
   if (!Array.isArray(result?.drafts)||!Array.isArray(result?.runs)) fail('La veille Supabase est momentanément indisponible.',502);
-  return {configured:true,drafts:result.drafts,runs:result.runs};
+  return {configured:true,drafts:result.drafts,runs:result.runs,published};
 }
 async function importJournalWatch(env,week) {
   const {drafts}=await journalWatch(env);

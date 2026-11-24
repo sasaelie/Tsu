@@ -142,6 +142,10 @@ function editorialRoute(pathname) {
     const week=weekly[2];
     return {path:editionPath(week),enPath:editionEnglishPath(week),page:'edition',en,week,title:editionTitle(week,en)};
   }
+  const focus = /^(dossier|spotlight)-(\d{4}-\d{2}-\d{2})$/.exec(match[2]);
+  if (focus && focus[1]===(en?'spotlight':'dossier') && editionDate(focus[2])) {
+    return {path:focusPath(focus[2]),enPath:focusEnglishPath(focus[2]),page:'focus',en,week:focus[2]};
+  }
   const managed = /^article-([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(match[2]);
   if (managed) return {path:journalArticlePath(managed[1]),page:'managed-article',en,slug:managed[1]};
   const article = journal.find(item=>(en?item.enSlug:item.slug)===match[2]);
@@ -153,6 +157,7 @@ function editorialRoute(pathname) {
 function editorialEnglishPath(path) {
   if (editorialPages[path]) return editorialPages[path].enPath;
   if (/^\/blog\/veille-\d{4}-\d{2}-\d{2}$/.test(path)) return editionEnglishPath(path.slice(-10));
+  if (/^\/blog\/dossier-\d{4}-\d{2}-\d{2}$/.test(path)) return focusEnglishPath(path.slice(-10));
   if (path.startsWith('/blog/article-')) return '/en'+path;
   const item = journal.find(article=>path==='/blog/'+article.slug);
   return item ? '/en/blog/'+item.enSlug : '';
@@ -260,7 +265,9 @@ function journalEditorial(en,editions) {
     journalFigure(journalImages.watch,en,true)+
     '<section id="sorties-manga"><h2>'+local(en,'Sorties manga VF et agenda anime','French manga releases and anime schedule')+'</h2>'+
     (editions.length?editionList(editions.slice(0,3),en):'<p>'+local(en,'Retrouve ci-dessous les dernières dates relevées et les calendriers à consulter.','Find the latest dates we checked and the calendars to follow below.')+'</p>')+
-    '<p>'+navLink('/blog/archives',en,'Consulter les archives de la veille','Browse release archives')+'</p>'+
+    '<p>'+navLink('/blog/archives',en,'Consulter les archives de la veille','Browse release archives')+
+    ' · <a href="'+journalFeedPath(en)+'">'+local(en,'Suivre le Journal par RSS','Follow the journal by RSS')+'</a></p>'+
+    focusList(editions.slice(0,3),en)+
     '<ul class="journal-grid">'+journalCard(featured,en)+'</ul>'+
     '<h3>'+local(en,'Dates relevées en novembre et décembre 2026','Release dates checked for November and December 2026')+'</h3><p>'+
     local(en,'Vérifiées le 24 novembre 2026 auprès des éditeurs et des fiches de parution. Pour la Belgique, vérifie aussi la disponibilité chez ton libraire.',

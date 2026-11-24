@@ -1,6 +1,10 @@
 # Veille du Journal TSŪ
 
-Supabase Cron lance chaque dimanche la fonction Edge `tsu-watch`. Elle collecte les sorties de la semaine suivante et crée un brouillon privé par lundi. Les rapports de collecte restent dans `tsu_watch_runs`. Les liens et dates sont conservés pour la relecture. TVmaze indique les diffusions japonaises. La disponibilité en Belgique reste à vérifier.
+Supabase Cron lance chaque dimanche la fonction Edge `tsu-watch`. Elle collecte les sorties de la semaine suivante à partir des catalogues Pika et Glénat, des plannings Manga-news et Icotaku, de l’API TVmaze et du RSS d’actualité Manga-news. Les flux d’actualité apportent du contexte, les calendriers fournissent les dates. TVmaze fournit les créneaux japonais. L’article renvoie vers des catalogues à consulter pour vérifier la disponibilité en Belgique.
+
+Le brouillon de collecte reste privé. Pour publier automatiquement, la fonction exige au moins trois mangas attestés par un éditeur ou deux calendriers et deux diffusions anime répertoriées. Les mangas dont les dates se contredisent restent en dehors de la publication. Les collections valides deviennent des instantanés par semaine, dans `tsu_watch_publications`. Les relances complètent le journal d’exécution sans remplacer un instantané déjà publié. La prochaine édition tente un angle différent et écarte les séries déjà traitées dans les dix éditions précédentes. DeepSeek reste disponible dans l’administration pour retravailler les articles à la demande.
+
+Le site lit les instantanés approuvés par une authentification serveur. Le Journal, ses archives, le sitemap et les flux `/blog/rss.xml` et `/en/blog/feed.xml` sont mis à jour depuis cette même source. Les articles du Journal déjà publiés alimentent aussi le RSS. La visibilité du site relève de la configuration Sites.
 
 ## Installer dans un autre projet Supabase
 
@@ -24,7 +28,7 @@ select cron.schedule('tsu_watch_weekly','0 16,17 * * 0',$job$
 $job$);
 ```
 
-Pour tester une semaine, remplacer le corps par `{"week":"2026-11-30"}` et exécuter la requête HTTP SQL une fois. La réponse se trouve dans `net._http_response`. Un brouillon partiel reste disponible si une source échoue. Une collecte vide ne remplace pas un brouillon existant.
+Pour tester une semaine, remplacer le corps par `{"week":"2026-11-30","dryRun":true}` et exécuter la requête HTTP SQL une fois. La réponse se trouve dans `net._http_response`. Un brouillon partiel reste disponible si une source échoue. Une collecte vide ne remplace pas un brouillon existant.
 
 ## Relier l’administration TSŪ
 

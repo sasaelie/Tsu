@@ -1,6 +1,7 @@
 import { load } from "cheerio";
+import { icotakuCards, newsCards, seriesKey, topicKey } from "./discovery.ts";
 
-export type Release = { kind: "manga" | "anime"; title: string; date: string; source: string; noteFr?: string; noteEn?: string };
+export type Release = { kind: "manga" | "anime"; title: string; date: string; source: string; noteFr?: string; noteEn?: string; provider:string; publisher?:string; official?:boolean; also?:string[] };
 const day = 86400000;
 const brussels = new Intl.DateTimeFormat("sv-SE",{ timeZone:"Europe/Brussels", year:"numeric", month:"2-digit", day:"2-digit" });
 const dateISO = (d: Date) => d.toISOString().slice(0,10);
@@ -20,7 +21,18 @@ const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})\b/g;
 export function mangaCards(markup: string, origin: string, publisher: string) {
   const $ = load(markup);
   const items: Release[] = [];
-  const prefix = publisher==="Pika" ? "/livre/" : "/manga/";
+  if (publisher==="Pika") {
+    $(".item-single a[href^='/livre/']").each((_,anchor)=>{
+      const card=$(anchor);
+      const source=new URL(card.attr("href")!,origin);
+      const title=neat(card.find("[role='img'][aria-label]").first().attr("aria-label")??"");
+      const date=dateFrom(card.find(".ReleaseDate").first().text());
+      if (title && date) items.push({kind:"manga",title,date,source:source.href,provider:publisher,publisher,official:true,
+        noteFr:"Parution francophone annoncée par Pika.",noteEn:"French-language release announced by Pika."});
+    });
+    return items;
+  }
+  const prefix = "/manga/";
   $("a[href]").each((_,anchor)=>{
     const href = $(anchor).attr("href") ?? "";
     let url: URL;
@@ -38,7 +50,7 @@ export function mangaCards(markup: string, origin: string, publisher: string) {
       const label = neat(heading.text() || $(anchor).attr("aria-label") || $(anchor).attr("title") || $(anchor).text() || card.text());
       const title = neat(label.replace(/^(?:remove_red_eye_outlined\s*)?(?:(?:À paraître|Nouveauté)\s*)?(?:Pika|Glénat)?\s*(?:Shônen|Shōnen|Seinen|Shôjo|Josei|Masterpiece|Wavetoon)?\s*/i,"").replace(datePattern,""));
       if (title.length<3 || title.length>150 || !/\p{L}/u.test(title)) break;
-      items.push({kind:"manga",title,date:dates[0],source:url.href,
+      items.push({kind:"manga",title,date:dates[0],source:url.href,provider:publisher,publisher,official:true,
         noteFr:"Parution indiquée par "+publisher+" pour l’édition francophone.",noteEn:"French-language publication listed by "+publisher+"."});
       break;
     }
@@ -60,7 +72,7 @@ export function mangaNewsCards(markup: string) {
     if (!date || !title || !publisher || !anchor.attr("href")) return;
     const source=new URL(anchor.attr("href")!,origin);
     if (source.origin!==origin) return;
-    items.push({kind:"manga",title,date,source:source.href,
+    items.push({kind:"manga",title,date,source:source.href,provider:"Manga-news",publisher,
       noteFr:"Édition francophone ("+publisher+"), selon le calendrier Manga-news.",
       noteEn:"French-language edition ("+publisher+"), according to the Manga-news calendar."});
   });
@@ -91,7 +103,8 @@ async function animeDay(date: string): Promise<Release[]> {
     if (!show?.genres?.includes("Anime") || typeof show.name!=="string" ||
         typeof show.url!=="string" || !show.url.startsWith("https://www.tvmaze.com/shows/")) return [];
     const suffix = typeof episode.number==="number" ? " · "+episode.number : "";
-    return [{kind:"anime",title:neat(show.name+suffix).slice(0,150),date,source:show.url,
+    const source=typeof episode.url==="string" && episode.url.startsWith("https://www.tvmaze.com/episodes/") ? episode.url : show.url;
+    return [{kind:"anime",title:neat(show.name+suffix).slice(0,150),date,source,provider:"TVmaze",official:true,
       noteFr:"Diffusion au Japon selon TVmaze. Disponibilité en Belgique à vérifier.",
       noteEn:"Japanese broadcast listed by TVmaze. Belgian availability is unverified."}];
   });
@@ -99,14 +112,55 @@ async function animeDay(date: string): Promise<Release[]> {
 
 export function selectReleases(items: Release[],week: string) {
   const end=endOfWeek(week);
-  const unique=new Map<string,Release>();
+  const groups=new Map<string,Release[]>();
   for (const item of items) {
-    if(item.date<week || item.date>end) continue;
-    const key=[item.kind,item.title.normalize("NFKC").toLocaleLowerCase().replace(/\b(?:vol[.]?|tome|t)\s*0*(\d+)/gi," tome $1").replace(/[^\p{L}\p{N}]/gu,"")].join("|");
-    if (!unique.has(key)) unique.set(key,item);
+    const key=item.kind+"|"+topicKey(item.title);
+    const group=groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key,group);
   }
-  const sorted=[...unique.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
-  return [...sorted.filter(x=>x.kind==="manga").slice(0,5), ...sorted.filter(x=>x.kind==="anime").slice(0,5)];
+  const candidates: Release[]=[];
+  const issues: string[]=[];
+  for (const release of groups.values()) {
+    const next=release.filter(item=>item.date>=week && item.date<=end);
+    if (!next.length) continue;
+    const first=next.find(item=>item.official) ?? next[0];
+    if (first.kind==="manga" && new Set(release.map(item=>item.date)).size>1) {
+      issues.push(first.title);
+      continue;
+    }
+    const others=next.filter(item=>item.provider!==first.provider).map(item=>item.source);
+    candidates.push({...first,also:[...new Set(others)].slice(0,2)});
+  }
+  const byDate=(a:Release,b:Release)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title);
+  const manga=candidates.filter(item=>item.kind==="manga").sort(byDate);
+  const trusted=manga.filter(item=>item.official || item.also?.length);
+  const perPublisher=new Map<string,Release>();
+  for (const item of trusted) {
+    const publisher=item.publisher ?? item.provider;
+    if (!perPublisher.has(publisher)) perPublisher.set(publisher,item);
+  }
+  // Verified titles always outrank unverified candidates, even when they share an editor.
+  const mangaPicks=[...new Set([...perPublisher.values(),...trusted,...manga])].slice(0,5);
+  const anime=candidates.filter(x=>x.kind==="anime").sort(byDate).slice(0,5);
+  return {items:[...mangaPicks,...anime],issues};
+}
+
+export function buildFocus(edition:{week:string;items:Release[]},previous:string[],news:ReturnType<typeof newsCards>) {
+  const weekNumber=Math.floor(+new Date(edition.week)/604800000);
+  const formats=["start","watch","reading"] as const;
+  let format=formats[weekNumber%formats.length];
+  const manga=edition.items.filter(item=>item.kind==="manga" && (item.official || item.also?.length));
+  const anime=edition.items.filter(item=>item.kind==="anime");
+  const chosen=format==="watch" ? anime : manga;
+  const fresh=chosen.filter(item=>!previous.includes(seriesKey(item.title)));
+  const startsSeries=(item:Release)=>/\bt(?:ome)?[. ]*0?1\b|\bvol[. ]*0?1\b|one[ -]?shot/i.test(item.title);
+  const release=(format==="start" ? fresh.find(startsSeries) : null) ?? fresh[0];
+  if (!release) return null;
+  if (format==="start" && !startsSeries(release)) format="reading";
+  const series=seriesKey(release.title);
+  const context=series.length>=8 ? news.find(item=>topicKey(item.title).includes(series)) : undefined;
+  return {format,series,release,context};
 }
 
 export async function collectWeek(week: string) {
@@ -119,6 +173,12 @@ export async function collectWeek(week: string) {
       const response=await request("https://www.manga-news.com/index.php/planning?p_editor=&p_month="+number+"&p_year="+year+"&print=1");
       const items=mangaNewsCards(await response.text());
       if (!items.length) throw new Error("Aucune sortie datée reconnue");
+      return items;
+    }});
+    inputs.push({label:"Icotaku "+month,run:async()=>{
+      const response=await request("https://manga.icotaku.com/planning/fr/"+month+"-01");
+      const items=icotakuCards(await response.text());
+      if (!items.length) throw new Error("Aucune fiche datée reconnue");
       return items;
     }});
     for (const [publisher,origin,path] of [
@@ -138,12 +198,16 @@ export async function collectWeek(week: string) {
     const date=dateISO(new Date(+new Date(week)+i*day));
     inputs.push({label:"TVmaze JP "+date,run:()=>animeDay(date)});
   }
-  const results=await Promise.allSettled(inputs.map(input=>input.run()));
-  const items=selectReleases(results.flatMap(r=>r.status==="fulfilled"?r.value:[]),week);
+  const newsPromise=Promise.allSettled([request("https://www.manga-news.com/index.php/feed/news")
+    .then(async response=>newsCards(await response.text()))]);
+  const [results,[newsResult]]=await Promise.all([Promise.allSettled(inputs.map(input=>input.run())),newsPromise]);
+  const news=newsResult.status==="fulfilled" ? newsResult.value : [];
+  const {items,issues}=selectReleases(results.flatMap(r=>r.status==="fulfilled"?r.value:[]),week);
   const sources=results.map((result,i)=>({name:inputs[i].label,ok:result.status==="fulfilled",
     count:result.status==="fulfilled"?result.value.length:0,
     ...(result.status==="rejected"?{error:result.reason instanceof Error?result.reason.message.slice(0,120):"Source indisponible"}:{})
   }));
-  return {edition:{week,introFr:"Une sélection des parutions francophones et diffusions anime repérées pour la semaine.",
+  sources.push({name:"Manga-news RSS",ok:news.length>0,count:news.length,...(!news.length?{error:"Flux indisponible ou vide"}:{})});
+  return {news,issues,edition:{week,introFr:"Une sélection des parutions francophones et diffusions anime repérées pour la semaine.",
     introEn:"A selection of French-language releases and anime broadcasts listed for this week.",items},sources};
 }

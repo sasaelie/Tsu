@@ -513,13 +513,31 @@ async function refreshWatch(editions) {
   const status=get('watch-status');
   const list=get('watch-drafts');
   try {
-    const {configured,drafts,runs}=await api('journal/watch');
+    const {configured,drafts,runs,published}=await api('journal/watch');
     const latest=runs[0];
+    const decisions={published:'Édition publiée automatiquement',review:'À relire avant publication','dry-run':'Contrôles réussis en mode test'};
     feedback(status,latest?new Date(latest.checked_at).toLocaleString('fr-BE',{timeZone:'Europe/Brussels'})+
-      ' · '+latest.count+' sorties retenues'+(latest.sources.some(source=>!source.ok)?' · Certaines sources étaient indisponibles.':''):
-      configured?'En attente du premier passage.':'Connexion Supabase à configurer.',latest?.count?'success':'neutral');
+      ' · '+(decisions[latest.decision]??'Collecte terminée')+' · '+latest.count+' sorties collectées':
+      configured?'En attente du premier passage.':'Connexion Supabase à configurer.',
+      latest?.decision==='review'?'error':latest?.count?'success':'neutral');
     list.replaceChildren();
-    for (const draft of drafts.filter(draft=>!editions.some(edition=>edition.week===draft.week))) {
+    const problems=latest?.sources.filter(source=>!source.ok)??[];
+    if (problems.length) {
+      const details=element('details');
+      details.append(element('summary','Résultats des vérifications'));
+      const diagnostics=element('ul');
+      for (const source of problems) diagnostics.append(element('li',source.name+' · '+(source.error??'Source indisponible')));
+      details.append(diagnostics);
+      list.append(details);
+    }
+    for (const item of published.slice(0,8)) {
+      const entry=element('p',item.week+' · Publiée automatiquement ');
+      const link=element('a','Voir l’édition');
+      link.href='/blog/veille-'+item.week;
+      entry.append(link);
+      list.append(entry);
+    }
+    for (const draft of drafts.filter(draft=>![...editions,...published].some(edition=>edition.week===draft.week))) {
       const entry=element('p',draft.week+' · '+draft.contents.items.length+' sorties ');
       entry.append(button('Ouvrir le brouillon',control=>run(control,async()=>{
         const {edition}=await api('journal/watch/import',{week:draft.week});

@@ -111,7 +111,7 @@ async function handle(request, env) {
   }
   if (method === 'GET' && pathname === '/compte/') return Response.redirect(origin+'/compte',302);
   if (method === 'GET' && pathname === '/admin/') return Response.redirect(origin+'/admin'+(deepLink ? '?tab='+deepLink : ''),302);
-  if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || storefrontRoute(pathname))) {
+  if (method === 'GET' && (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === journalFeedPath(false) || pathname === journalFeedPath(true) || storefrontRoute(pathname))) {
     return renderStorefront(request,env);
   }
   if (method === 'GET' && Object.hasOwn(assets,pathname)) {

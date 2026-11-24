@@ -66,11 +66,12 @@ function editionEditorial(edition,en) {
     if (!items.length) return '';
     return '<section><h2>'+label+'</h2><ul class="release-list">'+items.map(item=>'<li><time datetime="'+item.date+'">'+mangaDate(item.date,en)+'</time> · <strong>'+
       htmlEscape(item.title)+'</strong><p>'+htmlEscape(local(en,item.noteFr,item.noteEn) || item.noteFr || item.noteEn)+
-      '</p>'+externalEditorialLink(local(en,'Source de la date · ','Release source · ')+new URL(item.source).hostname.replace(/^www[.]/,''),item.source)+'</li>').join('')+'</ul></section>';
+      '</p>'+externalEditorialLink(local(en,'Source de la date · ','Release source · ')+new URL(item.source).hostname.replace(/^www[.]/,''),item.source)+(item.also?.length?' · '+externalEditorialLink(local(en,'Autre calendrier','Second calendar'),item.also[0]):'')+'</li>').join('')+'</ul></section>';
   }).join('');
   const intro=local(en,edition.introFr,edition.introEn) || edition.introFr || edition.introEn;
   return '<p class="article-meta">'+navLink('/blog/archives',en,'Archives du journal','Journal archive')+'</p>'+
     (intro?'<p class="editorial-lead">'+htmlEscape(intro)+'</p>':'')+journalFigure(journalImages.watch,en,true)+sections+
+    (edition.focus?'<p>'+navLink(focusPath(edition.week),en,'Lire le dossier de la semaine','Read the weekly spotlight')+'</p>':'')+
     '<p>'+externalEditorialLink(local(en,'Vérifier les simulcasts sur Crunchyroll','Check simulcasts on Crunchyroll'),'https://www.crunchyroll.com/fr/simulcasts')+'</p>'+
     '<p class="editorial-signature" lang="fr">Tu n’auras pas vu mon site pour rien.</p>';
 }

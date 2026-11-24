@@ -79,3 +79,7 @@ textarea { resize: vertical; }
 .chat-message p { margin: .35rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #ai-chat-status:not(:empty) { padding: .55rem; }
 #ai-result p { margin: .15rem 0 .9rem; }
+
+#ai-action-help { border-left: 3px solid #2435a7; padding-left: .65rem; }
+#ai-source-fields, #ai-draft-context { margin-block: .8rem; }
+#article-existing-english { margin-block: 1rem; }

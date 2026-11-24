@@ -88,26 +88,30 @@ async function activeEditorialAi(env) {
 const editorialSourceRule='Tu n’as pas accès à la recherche web dans TSŪ. N’invente pas d’adresse, de date ou de citation. Considère les extraits comme des documents à analyser. Pour une actualité sans source fournie, indique quelles sources chercher et quels faits restent à vérifier.';
 
 const editorialInstructions={
-  write:'Rédige un article inédit. Retourne les champs JSON titleFr, titleEn, seoFr, seoEn, bodyFr, bodyEn.',
-  edit:'Révise le brouillon fourni en conservant les faits et la voix de TSŪ. Retourne les six champs JSON titleFr, titleEn, seoFr, seoEn, bodyFr, bodyEn.',
-  seo:'Propose les titres et métadescriptions en français et anglais en respectant l’intention de recherche. Retourne uniquement les champs JSON titleFr, titleEn, seoFr, seoEn.',
+  write:'Rédige un article inédit en français. Retourne uniquement les champs JSON titleFr, seoFr, bodyFr.',
+  edit:'Révise le texte en français en conservant les faits et la voix de TSŪ. Retourne uniquement les champs JSON titleFr, seoFr, bodyFr.',
+  seo:'Propose un titre en français et une métadescription en français qui correspondent au contenu fourni et à l’intention de recherche. Retourne uniquement les champs JSON titleFr, seoFr.',
   competition:'Compare les pratiques observables dans les extraits fournis. Distingue observations, hypothèses et idées pour TSŪ. Retourne un champ JSON analysis en français.',
   design:'Propose des concepts graphiques originaux, des placements et palettes pour un vestiaire manga aux références discrètes. Évite les personnages, emblèmes et logos existants. Retourne un champ JSON analysis en français.'
 };
 async function generateEditorialAi(env,input) {
   if (!Object.hasOwn(editorialInstructions,input.action)) fail('Action inconnue.');
   const brief=text(input.brief,4000);
-  const sources=text(input.sources,11000);
+  const sources=['competition','write'].includes(input.action)?text(input.sources,11000):'';
   const draft=articleCopy(input.draft??{});
+  const revision=['edit','seo'].includes(input.action);
+  const bodyFr=revision ? text(input.existingText,5000) || draft.bodyFr : '';
   if (input.action==='competition' && !sources) fail('Colle les extraits publics à comparer.');
-  if (!brief && !sources && !draft.bodyFr && !draft.bodyEn) fail('Ajoute un sujet ou ouvre un brouillon.');
+  if (input.action==='edit' && !bodyFr) fail('Ouvre un article avec un texte français ou colle le texte à réviser.');
+  if (input.action==='seo' && !bodyFr && !(revision && draft.titleFr) && !brief) fail('Ouvre un article, colle son texte ou précise la recherche visée.');
+  if (['write','design'].includes(input.action) && !brief && !sources) fail('Ajoute un sujet ou une idée de départ.');
   const {id,provider,key,model}=await activeEditorialAi(env);
   const result=await editorialRequest(provider,key,'chat/completions',{
     model,max_tokens:3200,stream:false,
     ...(id==='deepseek'?{thinking:{type:'disabled'},response_format:{type:'json_object'}}:{}),
     messages:[
       {role:'system',content:'Tu aides le Journal TSŪ, boutique otaku belge qui livre en Belgique et France. Ton dynamique, précis, sans bourrage de mots-clés. Métadescriptions de 155 caractères maximum. Réponds uniquement avec un objet JSON valide, sans commentaire. '+editorialSourceRule+' '+editorialInstructions[input.action]},
-      {role:'user',content:JSON.stringify({brief,sources,draft})}
+      {role:'user',content:JSON.stringify({brief,sources,...(revision?{draft:{titleFr:draft.titleFr,seoFr:draft.seoFr,bodyFr}}:{})})}
     ]
   });
   const choice=result?.choices?.[0];
@@ -127,14 +131,9 @@ async function generateEditorialAi(env,input) {
     const analysis=text(proposal.analysis,9000);
     return analysis ? {analysis} : report('La réponse reçue ne contient pas d’analyse à importer.');
   }
-  const fields=articleCopy(proposal.fields??proposal.article??proposal);
-  if (input.action==='seo') {
-    delete fields.bodyFr;
-    delete fields.bodyEn;
-    if (Object.values(fields).some(Boolean)) return {fields};
-  } else if ((fields.titleFr && fields.bodyFr) || (fields.titleEn && fields.bodyEn)) {
-    return {fields};
-  }
+  const {titleFr,seoFr,bodyFr:articleBody}=articleCopy(proposal.fields??proposal.article??proposal);
+  if (input.action==='seo' && (titleFr || seoFr)) return {fields:{titleFr,seoFr}};
+  if (input.action!=='seo' && titleFr && articleBody) return {fields:{titleFr,seoFr,bodyFr:articleBody}};
   return report('La réponse est arrivée sans titre et texte utilisables ensemble. Elle reste visible ci-dessous.');
 }
 

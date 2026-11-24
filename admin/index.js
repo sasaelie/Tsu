@@ -472,12 +472,17 @@ journalForm.onsubmit=e=>{
 const articleForm=get('article-form');
 const articleFields=['titleFr','titleEn','seoFr','seoEn','bodyFr','bodyEn'];
 let aiProposal=null;
+let articleVersion=0;
 function editArticle(article={}) {
+  articleVersion++;
   articleForm.reset();
   articleForm.dataset.existing=String(Boolean(article.slug));
   articleForm.elements.slug.disabled=Boolean(article.slug);
   for (const field of ['slug',...articleFields]) articleForm.elements[field].value=article[field]??'';
+  get('article-existing-english').hidden=!['titleEn','seoEn','bodyEn'].some(field=>article[field]);
+  get('article-existing-english').open=false;
   articleForm.hidden=false;
+  updateEditorialDraftContext();
 }
 get('article-new').onclick=()=>{editArticle();articleForm.elements.slug.focus();};
 async function refreshArticles() {
@@ -502,6 +507,8 @@ articleForm.onsubmit=e=>{
     const data=Object.fromEntries(['slug',...articleFields].map(field=>[field,articleForm.elements[field].value]));
     await api('journal/articles',{...data,existing:articleForm.dataset.existing==='true',publish});
     articleForm.hidden=true;
+    articleVersion++;
+    updateEditorialDraftContext();
     aiProposal=null;
     get('ai-apply').hidden=true;
     await refreshArticles();
@@ -552,6 +559,77 @@ async function refreshWatch(editions) {
 
 const aiConfig=get('ai-config');
 const aiRequest=get('ai-request');
+const editorialActions={
+  write:{
+    help:'Pars d’un sujet pour obtenir un titre, un texte et une métadescription en français.',
+    brief:'Sujet de l’article',example:'Exemple : expliquer comment commencer le manga Naruto',
+    source:'Extraits de sources publiques (facultatif)',sourceHelp:'Pour une actualité, colle les extraits datés et leurs liens. La recherche web se fait en dehors de l’atelier.',
+    sourceExample:'Exemple : date, lien et extrait du calendrier de l’éditeur',submit:'Rédiger en français'
+  },
+  edit:{
+    help:'Améliore la clarté et le style d’un texte existant en gardant ses faits.',
+    brief:'Ce que tu souhaites améliorer (facultatif)',example:'Exemple : rendre l’introduction plus directe et raccourcir les phrases',
+    existing:'Texte français à réviser',submit:'Réviser le texte'
+  },
+  seo:{
+    help:'Propose un titre et une métadescription pour les résultats de recherche.',
+    brief:'Recherche visée',example:'Exemple : t-shirt manga discret en Belgique',
+    existing:'Texte ou résumé de la page (facultatif)',submit:'Proposer un titre et une métadescription'
+  },
+  competition:{
+    help:'Compare les pratiques visibles dans les extraits et propose des pistes pour TSŪ.',
+    brief:'Ce que tu veux comparer (facultatif)',example:'Exemple : la présentation des collections et les descriptions produit',
+    source:'Extraits des sites à comparer',sourceHelp:'Colle le nom, le lien et le passage de chaque site que tu veux comparer.',
+    sourceExample:'Exemple : boutique A, lien de la page, extrait de la description',submit:'Comparer les extraits'
+  },
+  design:{
+    help:'Obtiens des idées de visuels, de couleurs et de placement pour les produits TSŪ.',
+    brief:'Produit, thème et style souhaités',example:'Exemple : sweat noir, symbole original sur la manche, palette rouge et crème',
+    submit:'Proposer des idées de design'
+  }
+};
+const editorialAnswers=get('ai-result');
+const previousActionInputs={};
+let currentAction;
+function updateEditorialDraftContext() {
+  const title=articleForm.elements.titleFr.value.trim();
+  get('ai-draft-target').textContent=articleForm.hidden
+    ? 'Colle un texte ici ou ouvre un article dans la liste du Journal.'
+    : 'Article ouvert : '+(title||'brouillon sans titre')+'. Laisse le champ vide pour utiliser son texte.';
+}
+function showEditorialAction() {
+  const {action,brief,sources,existingText}=aiRequest.elements;
+  if (currentAction) previousActionInputs[currentAction]={brief:brief.value,sources:sources.value,existingText:existingText.value};
+  currentAction=action.value;
+  const options=editorialActions[currentAction];
+  const cached=previousActionInputs[currentAction]??{};
+  get('ai-action-help').textContent=options.help;
+  get('ai-brief-label').textContent=options.brief;
+  brief.placeholder=options.example;
+  brief.value=cached.brief??'';
+  brief.required=currentAction==='design';
+  get('ai-source-fields').hidden=!options.source;
+  get('ai-source-label').textContent=options.source??'';
+  get('ai-source-help').textContent=options.sourceHelp??'';
+  sources.disabled=!options.source;
+  sources.required=currentAction==='competition';
+  sources.placeholder=options.sourceExample??'';
+  sources.value=cached.sources??'';
+  get('ai-draft-context').hidden=!options.existing;
+  get('ai-existing-label').textContent=options.existing??'';
+  existingText.disabled=!options.existing;
+  existingText.value=cached.existingText??'';
+  updateEditorialDraftContext();
+  get('ai-request-submit').textContent=options.submit;
+  aiProposal=null;
+  editorialAnswers.hidden=true;
+  get('ai-apply').hidden=true;
+  feedback(get('ai-request-status'),'');
+}
+aiRequest.elements.action.onchange=showEditorialAction;
+articleForm.elements.titleFr.addEventListener('input',updateEditorialDraftContext);
+showEditorialAction();
+
 const aiChat=get('ai-chat');
 const chatForm=get('ai-chat-form');
 const chatContent=get('ai-chat-content');
@@ -692,13 +770,18 @@ aiRequest.onsubmit=e=>{
   get('ai-apply').hidden=true;
   get('ai-result').hidden=true;
   const data=Object.fromEntries(new FormData(aiRequest));
-  if (!articleForm.hidden && ['edit','seo'].includes(data.action)) {
-    data.draft=Object.fromEntries(articleFields.map(field=>[field,articleForm.elements[field].value]));
+  const usesOpenArticle=!articleForm.hidden && ['edit','seo'].includes(data.action) && !data.existingText?.trim();
+  if (usesOpenArticle) {
+    data.draft=Object.fromEntries(['titleFr','seoFr','bodyFr'].map(field=>[field,articleForm.elements[field].value]));
   }
+  const targetVersion=articleForm.hidden?null:articleVersion;
   const report=(message,tone)=>feedback(get('ai-request-status'),message,tone);
   return run(e.submitter,async()=>{
     report('Génération en cours…','pending');
-    const proposal=await api('editorial-ai/generate',data);
+    aiRequest.elements.action.disabled=true;
+    let proposal;
+    try { proposal=await api('editorial-ai/generate',data); }
+    finally { aiRequest.elements.action.disabled=false; }
     const output=get('ai-result');
     output.replaceChildren();
     if (proposal.fields) {
@@ -711,19 +794,26 @@ aiRequest.onsubmit=e=>{
       output.append(element('strong','Réponse reçue'),element('p',proposal.reply));
     }
     output.hidden=!output.childElementCount;
-    aiProposal=proposal.fields??null;
+    aiProposal=proposal.fields ? {fields:proposal.fields,targetVersion} : null;
+    get('ai-apply').textContent=data.action==='seo'?'Appliquer le titre et la métadescription':'Appliquer au brouillon';
     get('ai-apply').hidden=!aiProposal;
     report(proposal.message??'Proposition prête.',proposal.message?'neutral':'success');
   },report);
 };
 get('ai-apply').onclick=()=>{
   if (!aiProposal) return;
+  const {fields,targetVersion}=aiProposal;
+  if (targetVersion!==null && (articleForm.hidden || targetVersion!==articleVersion)) {
+    feedback(get('ai-request-status'),'L’article ouvert a changé. Relance la demande pour cet article.','error');
+    return;
+  }
   if (articleForm.hidden) editArticle();
-  for (const [field,value] of Object.entries(aiProposal)) {
+  for (const [field,value] of Object.entries(fields)) {
     if (value) articleForm.elements[field].value=value;
   }
   aiProposal=null;
   get('ai-apply').hidden=true;
   articleForm.elements.titleFr.focus();
+  updateEditorialDraftContext();
   notice('Proposition copiée dans le formulaire. Relis-la avant d’enregistrer.','success');
 };
